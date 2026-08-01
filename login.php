@@ -1,97 +1,261 @@
 <?php
 declare(strict_types=1);
 
-require_once __DIR__ . '/config/database.php';
+require_once __DIR__ . '/config/app.php';
+
+/*
+|--------------------------------------------------------------------------
+| EVITAR REGRESAR AL LOGIN SI YA EXISTE UNA SESIÓN
+|--------------------------------------------------------------------------
+*/
 
 if (!empty($_SESSION['usuario_id'])) {
     redirect('panel.php');
 }
 
-$error = '';
-$flashMessage = get_flash();
+/*
+|--------------------------------------------------------------------------
+| RECIBIR MENSAJES
+|--------------------------------------------------------------------------
+*/
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    verify_csrf();
-
-    $email = trim($_POST['email'] ?? '');
-    $password = $_POST['password'] ?? '';
-
-    if ($email === '' || $password === '') {
-        $error = 'Completa el correo y la contraseña.';
-    } else {
-        $stmt = $pdo->prepare(
-            'SELECT id, nombre, email, password, rol, estado
-             FROM usuarios
-             WHERE email = ?
-             LIMIT 1'
-        );
-        $stmt->execute([$email]);
-        $usuario = $stmt->fetch();
-
-        if (!$usuario || !password_verify($password, $usuario['password'])) {
-            $error = 'El correo o la contraseña son incorrectos.';
-        } elseif ($usuario['estado'] !== 'Activo') {
-            $error = 'Este usuario se encuentra inactivo.';
-        } else {
-            session_regenerate_id(true);
-
-            $_SESSION['usuario_id'] = (int) $usuario['id'];
-            $_SESSION['usuario_nombre'] = $usuario['nombre'];
-            $_SESSION['usuario_email'] = $usuario['email'];
-            $_SESSION['usuario_rol'] = $usuario['rol'];
-
-            redirect('panel.php');
-        }
-    }
-}
+$error = trim((string) ($_GET['error'] ?? ''));
+$msg   = trim((string) ($_GET['msg'] ?? ''));
 ?>
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Iniciar sesión | <?= e(APP_NAME) ?></title>
-    <link rel="stylesheet" href="<?= e(url('assets/css/style.css')) ?>">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Sistema Veterinario | Iniciar sesión</title>
+
+    <link
+        rel="stylesheet"
+        href="<?= e(url('assets/css/login.css')) ?>"
+    >
+
+    <style>
+        .boton-registrar-login {
+            display: block;
+            margin-top: 14px;
+            padding: 15px;
+
+            background: #10b981;
+            color: #ffffff;
+
+            text-align: center;
+            text-decoration: none;
+            font-weight: bold;
+
+            border-radius: 10px;
+
+            transition:
+                background-color 0.25s ease,
+                transform 0.25s ease;
+        }
+
+        .boton-registrar-login:hover {
+            background: #059669;
+            transform: translateY(-2px);
+        }
+
+        .alert {
+            margin-bottom: 18px;
+            padding: 14px;
+
+            background: #fee2e2;
+            border: 1px solid #fecaca;
+            border-radius: 10px;
+
+            color: #991b1b;
+            text-align: center;
+        }
+
+        .alert-success {
+            margin-bottom: 18px;
+            padding: 14px;
+
+            background: #dcfce7;
+            border: 1px solid #bbf7d0;
+            border-radius: 10px;
+
+            color: #166534;
+            text-align: center;
+        }
+    </style>
 </head>
-<body class="login-page">
-    <div class="login-box">
-        <div class="login-logo">
-            <span>🐾</span>
-            <h1>Clínica Veterinaria El Campo</h1>
-            <p>Ingresa al sistema de gestión</p>
+
+<body>
+
+<div class="login-wrapper">
+
+    <!-- PARTE IZQUIERDA -->
+    <section class="login-hero">
+
+        <div class="brand">
+            <div class="brand-icon">🐾</div>
+            <h1>Sistema Veterinario</h1>
         </div>
 
-        <?php if ($flashMessage): ?>
-            <div class="alert alert-<?= e($flashMessage['type']) ?>">
-                <?= e($flashMessage['message']) ?>
+        <div class="welcome">
+            <h2>Bienvenido</h2>
+
+            <p>
+                Inicie sesión para acceder al sistema.
+            </p>
+        </div>
+
+        <img
+            src="<?= e(url('assets/img/perro_gato.png')) ?>"
+            alt="Perro y gato"
+            class="pets-img"
+        >
+
+    </section>
+
+    <!-- PARTE DERECHA -->
+    <section class="login-panel">
+
+        <form
+    action="procesar_login.php"
+    method="POST"
+    class="login-card"
+    autocomplete="on"
+>
+
+            <div class="lock-icon">🔒</div>
+
+            <h2>Iniciar sesión</h2>
+
+            <?php if ($msg === 'password_actualizada'): ?>
+                <div class="alert-success">
+                    Contraseña actualizada correctamente.
+                </div>
+            <?php endif; ?>
+
+            <?php if ($msg === 'registro_exitoso'): ?>
+                <div class="alert-success">
+                    Usuario registrado correctamente. Ya puede iniciar sesión.
+                </div>
+            <?php endif; ?>
+
+            <?php if ($error === 'campos_vacios'): ?>
+
+                <div class="alert">
+                    Complete todos los campos.
+                </div>
+
+            <?php elseif ($error === 'correo_invalido'): ?>
+
+                <div class="alert">
+                    Ingrese un correo electrónico válido.
+                </div>
+
+            <?php elseif ($error === 'credenciales_invalidas'): ?>
+
+                <div class="alert">
+                    Correo o contraseña incorrectos.
+                </div>
+
+            <?php elseif ($error === 'usuario_inactivo'): ?>
+
+                <div class="alert">
+                    El usuario está inactivo.
+                </div>
+
+            <?php elseif ($error === 'metodo_invalido'): ?>
+
+                <div class="alert">
+                    Solicitud no válida.
+                </div>
+
+            <?php elseif ($error === 'conexion'): ?>
+
+                <div class="alert">
+                    No fue posible conectarse con la base de datos.
+                </div>
+
+            <?php elseif ($error === 'sistema'): ?>
+
+                <div class="alert">
+                    Ocurrió un error en el sistema. Intente nuevamente.
+                </div>
+
+            <?php endif; ?>
+
+            <label for="correo">
+                Correo electrónico
+            </label>
+
+            <input
+                type="email"
+                id="correo"
+                name="correo"
+                placeholder="Ingrese su correo"
+                autocomplete="email"
+                required
+            >
+
+            <label for="contrasena">
+                Contraseña
+            </label>
+
+            <input
+                type="password"
+                id="contrasena"
+                name="contrasena"
+                placeholder="Ingrese su contraseña"
+                autocomplete="current-password"
+                required
+            >
+
+            <div class="options">
+
+                <label class="remember">
+                    <input
+                        type="checkbox"
+                        name="recordarme"
+                        value="1"
+                    >
+
+                    Recordarme
+                </label>
+
+                <a href="<?= e(url('recuperar.php')) ?>">
+                    ¿Olvidó su contraseña?
+                </a>
+
             </div>
-        <?php endif; ?>
 
-        <?php if ($error !== ''): ?>
-            <div class="alert alert-error"><?= e($error) ?></div>
-        <?php endif; ?>
+            <button type="submit">
+                Ingresar
+            </button>
 
-        <form class="login-form" method="post">
-            <?= csrf_field() ?>
+            <!-- En tu estructura el archivo se llama registrar.php -->
+            <a
+                href="<?= e(url('registrar.php')) ?>"
+                class="boton-registrar-login"
+            >
+                Registrar nuevo usuario
+            </a>
 
-            <div class="form-group">
-                <label for="email">Correo electrónico</label>
-                <input id="email" name="email" type="email" value="<?= e($_POST['email'] ?? '') ?>" required autofocus>
-            </div>
+            <p class="footer">
+                © <?= date('Y') ?> Sistema Veterinario
+            </p>
 
-            <div class="form-group">
-                <label for="password">Contraseña</label>
-                <input id="password" name="password" type="password" required>
-            </div>
-
-            <button class="btn btn-primary" type="submit">🔐 Iniciar sesión</button>
         </form>
 
-        <div class="login-help">
-            <strong>Usuario de prueba</strong><br>
-            Correo: admin@elcampo.ec<br>
-            Contraseña: Admin123*
-        </div>
-    </div>
+    </section>
+
+</div>
+
+<script src="<?= e(url('assets/js/app.js')) ?>"></script>
+
 </body>
 </html>
