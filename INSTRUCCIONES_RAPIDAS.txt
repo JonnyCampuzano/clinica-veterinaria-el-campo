@@ -1,0 +1,26 @@
+CLÍNICA VETERINARIA EL CAMPO - PASOS RÁPIDOS
+
+1. Descomprime la carpeta.
+2. Cópiala en C:\xampp\htdocs\
+3. Enciende Apache y MySQL en XAMPP.
+4. Abre:
+   http://localhost/clinica_veterinaria_el_campo/instalar.php
+5. Usa:
+   Servidor: localhost
+   Puerto: 3306
+   Usuario: root
+   Contraseña: déjala vacía
+6. Pulsa "Crear base de datos".
+7. Inicia sesión:
+   Correo: admin@elcampo.ec
+   Contraseña: Admin123*
+
+Para editar el código:
+Visual Studio Code -> Archivo -> Abrir carpeta ->
+C:\xampp\htdocs\clinica_veterinaria_el_campo
+
+PÁGINA PÚBLICA:
+http://localhost/clinica_veterinaria_el_campo/
+
+PANEL ADMINISTRATIVO:
+http://localhost/clinica_veterinaria_el_campo/login.php
