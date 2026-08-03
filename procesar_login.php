@@ -1,12 +1,9 @@
 <?php
 declare(strict_types=1);
 
-require_once __DIR__ . '/config/app.php';
-require_once __DIR__ . '/config/conexion.php';
-
 /*
 |--------------------------------------------------------------------------
-| ASEGURAR QUE LA SESIÓN ESTÉ ACTIVA
+| INICIAR SESIÓN
 |--------------------------------------------------------------------------
 */
 
@@ -16,205 +13,217 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
 
 /*
 |--------------------------------------------------------------------------
-| REDIRECCIÓN LOCAL
+| CARGAR CONFIGURACIÓN Y CONEXIÓN
 |--------------------------------------------------------------------------
 */
 
-function irA(string $ruta): never
-{
-    header('Location: ' . $ruta);
+require_once __DIR__ . '/config/app.php';
+require_once __DIR__ . '/config/conexion.php';
+
+/*
+|--------------------------------------------------------------------------
+| PERMITIR ÚNICAMENTE SOLICITUD POST
+|--------------------------------------------------------------------------
+*/
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    redirect('login.php?error=metodo_invalido');
     exit;
 }
 
 /*
 |--------------------------------------------------------------------------
-| SOLO ACEPTAR ENVÍOS POST
+| VERIFICAR CONEXIÓN PDO
 |--------------------------------------------------------------------------
 */
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    irA('login.php?error=metodo_invalido');
+if (!isset($pdo) || !($pdo instanceof PDO)) {
+    $_SESSION['error_login'] =
+        'No fue posible conectarse con la base de datos.';
+
+    redirect('login.php');
+    exit;
 }
 
 /*
 |--------------------------------------------------------------------------
-| RECIBIR LOS DATOS
+| RECIBIR DATOS DEL FORMULARIO
 |--------------------------------------------------------------------------
 */
 
-$correo = trim((string) ($_POST['correo'] ?? ''));
+$correo = strtolower(
+    trim((string) ($_POST['correo'] ?? ''))
+);
+
 $contrasena = (string) ($_POST['contrasena'] ?? '');
 
 /*
 |--------------------------------------------------------------------------
-| VALIDAR LOS DATOS
+| VALIDAR CAMPOS
 |--------------------------------------------------------------------------
 */
 
 if ($correo === '' || $contrasena === '') {
-    irA('login.php?error=campos_vacios');
+    redirect('login.php?error=campos_vacios');
+    exit;
 }
 
 if (!filter_var($correo, FILTER_VALIDATE_EMAIL)) {
-    irA('login.php?error=correo_invalido');
-}
-
-/*
-|--------------------------------------------------------------------------
-| COMPROBAR LA CONEXIÓN
-|--------------------------------------------------------------------------
-*/
-
-if (!$conexion instanceof mysqli) {
-    error_log(
-        'No existe una conexión válida en config/conexion.php.'
-    );
-
-    irA('login.php?error=conexion');
+    redirect('login.php?error=correo_invalido');
+    exit;
 }
 
 try {
     /*
     |--------------------------------------------------------------------------
-    | BUSCAR EL USUARIO
+    | BUSCAR USUARIO POR CORREO
     |--------------------------------------------------------------------------
-    | En tu tabla la columna principal se llama "id".
     */
 
-    $sql = '
-        SELECT
-            id AS id_usuario,
+    $consulta = $pdo->prepare(
+        'SELECT
+            id,
             nombre,
             correo,
             contrasena,
             rol,
             estado
-        FROM usuarios
-        WHERE correo = ?
-        LIMIT 1
-    ';
+         FROM usuarios
+         WHERE correo = :correo
+         LIMIT 1'
+    );
 
-    $consulta = $conexion->prepare($sql);
-    $consulta->bind_param('s', $correo);
-    $consulta->execute();
-    $consulta->store_result();
+    $consulta->execute([
+        ':correo' => $correo
+    ]);
+
+    $usuario = $consulta->fetch(PDO::FETCH_ASSOC);
 
     /*
     |--------------------------------------------------------------------------
-    | COMPROBAR SI EL USUARIO EXISTE
+    | COMPROBAR QUE EL USUARIO EXISTA
     |--------------------------------------------------------------------------
     */
 
-    if ($consulta->num_rows !== 1) {
-        $consulta->close();
-
-        irA('login.php?error=credenciales_invalidas');
+    if (!$usuario) {
+        redirect('login.php?error=credenciales_invalidas');
+        exit;
     }
 
     /*
     |--------------------------------------------------------------------------
-    | OBTENER LOS DATOS
-    |--------------------------------------------------------------------------
-    */
-
-    $consulta->bind_result(
-        $idUsuario,
-        $nombreUsuario,
-        $correoGuardado,
-        $contrasenaGuardada,
-        $rolUsuario,
-        $estadoUsuario
-    );
-
-    $consulta->fetch();
-    $consulta->close();
-
-    /*
-    |--------------------------------------------------------------------------
-    | VALIDAR EL ESTADO
+    | COMPROBAR ESTADO DEL USUARIO
     |--------------------------------------------------------------------------
     */
 
     $estadoUsuario = strtolower(
-        trim((string) $estadoUsuario)
+        trim((string) ($usuario['estado'] ?? ''))
     );
 
     if ($estadoUsuario !== 'activo') {
-        irA('login.php?error=usuario_inactivo');
+        redirect('login.php?error=usuario_inactivo');
+        exit;
     }
 
     /*
     |--------------------------------------------------------------------------
-    | VALIDAR LA CONTRASEÑA
+    | COMPROBAR CONTRASEÑA
     |--------------------------------------------------------------------------
     */
 
-    $contrasenaGuardada = (string) $contrasenaGuardada;
-
-    $contrasenaCorrecta = false;
-
-    /*
-    | Para contraseñas guardadas con password_hash().
-    */
-
-    if (password_verify($contrasena, $contrasenaGuardada)) {
-        $contrasenaCorrecta = true;
-    }
-
-    /*
-    | Compatibilidad temporal con contraseñas guardadas como texto.
-    */
+    $contrasenaGuardada = (string) (
+        $usuario['contrasena'] ?? ''
+    );
 
     if (
-        !$contrasenaCorrecta &&
-        hash_equals($contrasenaGuardada, $contrasena)
+        $contrasenaGuardada === '' ||
+        !password_verify(
+            $contrasena,
+            $contrasenaGuardada
+        )
     ) {
-        $contrasenaCorrecta = true;
-    }
-
-    if (!$contrasenaCorrecta) {
-        irA('login.php?error=credenciales_invalidas');
+        redirect('login.php?error=credenciales_invalidas');
+        exit;
     }
 
     /*
     |--------------------------------------------------------------------------
-    | CREAR LA SESIÓN
+    | PREPARAR NOMBRE Y ROL
+    |--------------------------------------------------------------------------
+    */
+
+    $nombreUsuario = trim(
+        (string) ($usuario['nombre'] ?? '')
+    );
+
+    $rolUsuario = trim(
+        (string) ($usuario['rol'] ?? '')
+    );
+
+    if ($nombreUsuario === '') {
+        $nombreUsuario = 'Usuario';
+    }
+
+    if ($rolUsuario === '') {
+        $rolUsuario = 'Usuario';
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | REGENERAR ID DE SESIÓN
     |--------------------------------------------------------------------------
     */
 
     session_regenerate_id(true);
 
-    $_SESSION['usuario_id'] = (int) $idUsuario;
-    $_SESSION['id_usuario'] = (int) $idUsuario;
-
-    $_SESSION['usuario'] = (string) $nombreUsuario;
-    $_SESSION['nombre'] = (string) $nombreUsuario;
-
-    $_SESSION['correo'] = (string) $correoGuardado;
-    $_SESSION['rol'] = (string) $rolUsuario;
-    $_SESSION['inicio_sesion'] = time();
-
     /*
     |--------------------------------------------------------------------------
-    | ENTRAR AL PANEL
+    | GUARDAR DATOS DEL USUARIO EN LA SESIÓN
     |--------------------------------------------------------------------------
     */
 
-    irA('panel.php');
+    $_SESSION['usuario_id'] =
+        (int) $usuario['id'];
 
-} catch (mysqli_sql_exception $error) {
+    $_SESSION['id_usuario'] =
+        (int) $usuario['id'];
+
+    $_SESSION['nombre'] =
+        $nombreUsuario;
+
+    $_SESSION['usuario'] =
+        $nombreUsuario;
+
+    $_SESSION['correo'] =
+        (string) $usuario['correo'];
+
+    $_SESSION['rol'] =
+        $rolUsuario;
+
+    $_SESSION['autenticado'] = true;
+
+    /*
+    |--------------------------------------------------------------------------
+    | REDIRECCIONAR AL PANEL
+    |--------------------------------------------------------------------------
+    */
+
+    redirect('panel.php');
+    exit;
+
+} catch (PDOException $e) {
+    /*
+     * Guarda el error técnico en el registro de PHP.
+     */
+
     error_log(
-        'Error SQL durante el inicio de sesión: ' .
-        $error->getMessage()
+        'Error en procesar_login.php: ' .
+        $e->getMessage()
     );
 
-    irA('login.php?error=conexion');
+    $_SESSION['error_login'] =
+        'Ocurrió un error al iniciar sesión. Intente nuevamente.';
 
-} catch (Throwable $error) {
-    error_log(
-        'Error general durante el inicio de sesión: ' .
-        $error->getMessage()
-    );
-
-    irA('login.php?error=sistema');
+    redirect('login.php');
+    exit;
 }

@@ -11,7 +11,8 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
 |--------------------------------------------------------------------------
 */
 
-define('BASE_URL', '/Clinica_Veterinaria_El_Campo');
+define('BASE_URL', '/clinica_veterinaria_el_campo');
+define('APP_URL', BASE_URL);
 
 function url(string $ruta = ''): string
 {

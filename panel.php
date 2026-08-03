@@ -3,12 +3,6 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/config/app.php';
 
-/*
-|--------------------------------------------------------------------------
-| INICIAR SESIÓN
-|--------------------------------------------------------------------------
-*/
-
 if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
 }
@@ -34,32 +28,83 @@ if (empty($idUsuario)) {
 |--------------------------------------------------------------------------
 */
 
-$nombreUsuario = $_SESSION['nombre']
-    ?? $_SESSION['usuario']
-    ?? 'Usuario';
+$nombreUsuario = trim(
+    (string) (
+        $_SESSION['nombre']
+        ?? $_SESSION['usuario']
+        ?? ''
+    )
+);
 
-$rolUsuario = $_SESSION['rol']
-    ?? 'Usuario';
+if ($nombreUsuario === '') {
+    $nombreUsuario = 'Usuario';
+}
+
+$rolUsuario = trim(
+    (string) (
+        $_SESSION['rol']
+        ?? ''
+    )
+);
+
+if ($rolUsuario === '') {
+    $rolUsuario = 'Usuario';
+}
 
 /*
 |--------------------------------------------------------------------------
-| BUSCAR EL ARCHIVO PRINCIPAL DE CADA MÓDULO
+| FUNCIONES DE APOYO
 |--------------------------------------------------------------------------
 */
 
-function encontrarRuta(array $rutas): ?string
-{
-    foreach ($rutas as $ruta) {
-        $rutaCompleta = __DIR__
-            . DIRECTORY_SEPARATOR
-            . str_replace('/', DIRECTORY_SEPARATOR, $ruta);
+if (!function_exists('encontrarRuta')) {
+    function encontrarRuta(array $rutas): ?string
+    {
+        foreach ($rutas as $ruta) {
+            $rutaCompleta = __DIR__
+                . DIRECTORY_SEPARATOR
+                . str_replace('/', DIRECTORY_SEPARATOR, $ruta);
 
-        if (is_file($rutaCompleta)) {
-            return $ruta;
+            if (is_file($rutaCompleta)) {
+                return $ruta;
+            }
         }
-    }
 
-    return null;
+        return null;
+    }
+}
+
+if (!function_exists('inicialUsuario')) {
+    function inicialUsuario(string $nombre): string
+    {
+        $nombre = trim($nombre);
+
+        if ($nombre === '') {
+            return 'U';
+        }
+
+        if (function_exists('mb_substr')) {
+            return strtoupper(mb_substr($nombre, 0, 1, 'UTF-8'));
+        }
+
+        return strtoupper(substr($nombre, 0, 1));
+    }
+}
+
+/*
+|--------------------------------------------------------------------------
+| SALUDO DINÁMICO
+|--------------------------------------------------------------------------
+*/
+
+$hora = (int) date('H');
+
+if ($hora >= 5 && $hora < 12) {
+    $saludo = 'Buenos días';
+} elseif ($hora >= 12 && $hora < 19) {
+    $saludo = 'Buenas tardes';
+} else {
+    $saludo = 'Buenas noches';
 }
 
 /*
@@ -152,8 +197,12 @@ foreach ($modulos as $indice => $modulo) {
 }
 
 $totalModulos = count($modulos);
+$modulosNoDisponibles = $totalModulos - $modulosDisponibles;
+
 $fechaActual = date('d/m/Y');
 $horaActual = date('H:i');
+$anioActual = date('Y');
+$inicial = inicialUsuario($nombreUsuario);
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -166,28 +215,43 @@ $horaActual = date('H:i');
         content="width=device-width, initial-scale=1.0"
     >
 
-    <title>Dashboard | Clínica Veterinaria El Campo</title>
+    <title>Panel Principal | Clínica Veterinaria El Campo</title>
 
     <style>
         :root {
-            --sidebar: #0b1f3a;
-            --sidebar-soft: #112a4d;
             --primary: #2563eb;
             --primary-dark: #1d4ed8;
-            --primary-soft: #eaf2ff;
+            --primary-soft: #dbeafe;
+
             --success: #16a34a;
             --success-soft: #dcfce7;
+
             --warning: #d97706;
             --warning-soft: #fef3c7;
+
             --danger: #dc2626;
-            --danger-dark: #b91c1c;
+            --danger-soft: #fee2e2;
+
+            --violet: #7c3aed;
+            --violet-soft: #ede9fe;
+
+            --sidebar: #0f172a;
+            --sidebar-soft: #1e293b;
+
+            --bg: #f1f5f9;
             --surface: #ffffff;
-            --background: #f4f7fb;
-            --text: #15345b;
-            --muted: #6b7d98;
-            --border: #dce6f2;
-            --shadow: 0 12px 30px rgba(15, 47, 92, 0.08);
-            --radius: 16px;
+            --surface-soft: #f8fafc;
+
+            --text: #0f172a;
+            --muted: #64748b;
+            --border: #e2e8f0;
+
+            --shadow-sm: 0 8px 20px rgba(15, 23, 42, 0.05);
+            --shadow-md: 0 16px 40px rgba(15, 23, 42, 0.08);
+
+            --radius-lg: 22px;
+            --radius-md: 16px;
+            --radius-sm: 12px;
         }
 
         * {
@@ -202,9 +266,10 @@ $horaActual = date('H:i');
 
         body {
             min-height: 100vh;
-            overflow-x: hidden;
+            background:
+                radial-gradient(circle at top right, rgba(37, 99, 235, 0.08), transparent 25%),
+                linear-gradient(180deg, #f8fbff 0%, var(--bg) 100%);
             color: var(--text);
-            background: var(--background);
             font-family: "Segoe UI", Arial, sans-serif;
         }
 
@@ -220,11 +285,11 @@ $horaActual = date('H:i');
         .app-layout {
             min-height: 100vh;
             display: grid;
-            grid-template-columns: 280px minmax(0, 1fr);
+            grid-template-columns: 290px minmax(0, 1fr);
         }
 
         /* =========================
-           BARRA LATERAL
+           SIDEBAR
         ========================= */
 
         .sidebar {
@@ -233,61 +298,54 @@ $horaActual = date('H:i');
             height: 100vh;
             display: flex;
             flex-direction: column;
-            padding: 24px 18px;
-            color: #dbe8f8;
-            background:
-                linear-gradient(
-                    180deg,
-                    var(--sidebar) 0%,
-                    #08182e 100%
-                );
-            box-shadow: 8px 0 30px rgba(8, 24, 46, 0.13);
-            z-index: 200;
+            padding: 22px 18px;
+            color: #cbd5e1;
+            background: linear-gradient(
+                180deg,
+                var(--sidebar) 0%,
+                #111827 100%
+            );
+            box-shadow: 10px 0 30px rgba(2, 6, 23, 0.12);
+            z-index: 100;
         }
 
         .brand {
             display: flex;
             align-items: center;
-            gap: 13px;
-            padding: 0 8px 25px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+            gap: 12px;
+            padding: 0 8px 22px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
         }
 
         .brand-logo {
-            width: 50px;
-            height: 50px;
-            flex: 0 0 50px;
+            width: 54px;
+            height: 54px;
             display: grid;
             place-items: center;
-            border-radius: 14px;
-            color: #ffffff;
-            background:
-                linear-gradient(
-                    135deg,
-                    #3b82f6,
-                    #1d4ed8
-                );
-            font-size: 25px;
-            box-shadow: 0 10px 24px rgba(37, 99, 235, 0.28);
+            border-radius: 16px;
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: #fff;
+            font-size: 26px;
+            box-shadow: 0 12px 26px rgba(37, 99, 235, 0.35);
         }
 
         .brand-text strong {
             display: block;
-            color: #ffffff;
+            color: #fff;
             font-size: 15px;
-            line-height: 1.25;
+            line-height: 1.3;
         }
 
         .brand-text span {
             display: block;
-            margin-top: 4px;
-            color: #90a8c5;
+            margin-top: 3px;
+            color: #94a3b8;
             font-size: 12px;
         }
 
-        .sidebar-label {
-            margin: 24px 10px 10px;
-            color: #6f89aa;
+        .nav-title {
+            margin: 22px 10px 10px;
+            color: #64748b;
             font-size: 11px;
             font-weight: 800;
             letter-spacing: 0.12em;
@@ -296,103 +354,101 @@ $horaActual = date('H:i');
 
         .sidebar-nav {
             display: grid;
-            gap: 7px;
+            gap: 8px;
         }
 
-        .sidebar-link {
-            min-height: 46px;
+        .sidebar-link,
+        .sidebar-link-disabled {
+            min-height: 48px;
             display: flex;
             align-items: center;
             gap: 12px;
-            padding: 10px 12px;
-            color: #bed0e6;
-            border-radius: 11px;
+            padding: 12px 14px;
+            border-radius: 12px;
             font-size: 14px;
             font-weight: 700;
             transition:
-                color 0.2s ease,
+                transform 0.2s ease,
                 background-color 0.2s ease,
-                transform 0.2s ease;
+                color 0.2s ease;
+        }
+
+        .sidebar-link {
+            color: #cbd5e1;
         }
 
         .sidebar-link:hover,
         .sidebar-link.active {
             color: #ffffff;
-            background: rgba(37, 99, 235, 0.25);
+            background: rgba(37, 99, 235, 0.22);
             transform: translateX(3px);
         }
 
-        .sidebar-link.disabled {
-            opacity: 0.45;
+        .sidebar-link-disabled {
+            color: #64748b;
             cursor: not-allowed;
-        }
-
-        .sidebar-link.disabled:hover {
-            transform: none;
-            color: #bed0e6;
-            background: transparent;
+            opacity: 0.65;
         }
 
         .sidebar-icon {
-            width: 28px;
-            display: inline-flex;
-            justify-content: center;
-            font-size: 18px;
+            width: 26px;
+            text-align: center;
+            font-size: 17px;
         }
 
         .sidebar-footer {
             margin-top: auto;
-            padding-top: 20px;
-            border-top: 1px solid rgba(255, 255, 255, 0.09);
+            padding-top: 18px;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
         }
 
-        .sidebar-user {
+        .user-card {
             display: flex;
             align-items: center;
-            gap: 11px;
-            margin-bottom: 13px;
-            padding: 11px;
-            border-radius: 12px;
-            background: rgba(255, 255, 255, 0.06);
+            gap: 12px;
+            padding: 14px;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.05);
+            margin-bottom: 12px;
         }
 
-        .sidebar-avatar {
-            width: 38px;
-            height: 38px;
-            flex: 0 0 38px;
+        .user-avatar {
+            width: 46px;
+            height: 46px;
             display: grid;
             place-items: center;
             border-radius: 50%;
-            color: #ffffff;
-            background: #1d4ed8;
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            color: #fff;
+            font-size: 18px;
             font-weight: 900;
+            flex: 0 0 46px;
         }
 
-        .sidebar-user strong {
+        .user-card strong {
             display: block;
-            color: #ffffff;
-            font-size: 13px;
+            color: #fff;
+            font-size: 14px;
         }
 
-        .sidebar-user span {
+        .user-card span {
             display: block;
-            margin-top: 3px;
-            color: #8fa6c2;
-            font-size: 11px;
-            text-transform: capitalize;
+            margin-top: 4px;
+            color: #94a3b8;
+            font-size: 12px;
         }
 
         .logout-button {
             width: 100%;
-            min-height: 44px;
-            display: flex;
+            min-height: 46px;
+            display: inline-flex;
             align-items: center;
             justify-content: center;
             gap: 8px;
-            color: #ffffff;
-            background: rgba(220, 38, 38, 0.16);
-            border: 1px solid rgba(248, 113, 113, 0.22);
-            border-radius: 10px;
+            background: rgba(220, 38, 38, 0.14);
+            border: 1px solid rgba(248, 113, 113, 0.25);
+            color: #fff;
+            border-radius: 12px;
             font-weight: 800;
             transition:
                 background-color 0.2s ease,
@@ -400,26 +456,26 @@ $horaActual = date('H:i');
         }
 
         .logout-button:hover {
+            background: rgba(220, 38, 38, 0.24);
             transform: translateY(-2px);
-            background: rgba(220, 38, 38, 0.28);
         }
 
         /* =========================
-           CONTENIDO PRINCIPAL
+           MAIN
         ========================= */
 
         .main-content {
             min-width: 0;
-            padding: 0 32px 45px;
+            padding: 26px 28px 40px;
         }
 
         .topbar {
-            min-height: 78px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 25px;
-            margin-bottom: 25px;
+            gap: 18px;
+            margin-bottom: 24px;
+            padding-bottom: 18px;
             border-bottom: 1px solid var(--border);
         }
 
@@ -431,136 +487,207 @@ $horaActual = date('H:i');
 
         .menu-button {
             display: none;
-            width: 42px;
-            height: 42px;
+            width: 44px;
+            height: 44px;
             border: 1px solid var(--border);
-            border-radius: 10px;
-            color: var(--text);
+            border-radius: 12px;
             background: var(--surface);
+            color: var(--text);
             cursor: pointer;
+            box-shadow: var(--shadow-sm);
         }
 
         .page-title h1 {
+            font-size: 30px;
+            line-height: 1.15;
             color: var(--text);
-            font-size: 24px;
-            line-height: 1.2;
         }
 
         .page-title p {
-            margin-top: 4px;
+            margin-top: 6px;
             color: var(--muted);
-            font-size: 13px;
+            font-size: 14px;
         }
 
-        .topbar-status {
+        .topbar-badges {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .badge {
             display: inline-flex;
             align-items: center;
             gap: 9px;
-            padding: 9px 13px;
-            color: #166534;
-            background: var(--success-soft);
-            border: 1px solid #bbf7d0;
+            padding: 10px 14px;
             border-radius: 999px;
             font-size: 13px;
             font-weight: 800;
+            white-space: nowrap;
         }
 
-        .status-dot {
-            width: 8px;
-            height: 8px;
+        .badge-success {
+            color: #166534;
+            background: var(--success-soft);
+            border: 1px solid #bbf7d0;
+        }
+
+        .badge-primary {
+            color: #1d4ed8;
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+        }
+
+        .dot {
+            width: 9px;
+            height: 9px;
             border-radius: 50%;
-            background: var(--success);
-            box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.12);
+            background: currentColor;
         }
 
         /* =========================
-           BIENVENIDA
+           HERO
         ========================= */
 
-        .welcome-card {
+        .hero {
             position: relative;
             overflow: hidden;
             display: grid;
-            grid-template-columns: minmax(0, 1fr) auto;
-            align-items: center;
-            gap: 30px;
+            grid-template-columns: minmax(0, 1fr) 320px;
+            gap: 24px;
             margin-bottom: 24px;
-            padding: 34px;
-            color: #ffffff;
-            background:
-                linear-gradient(
-                    135deg,
-                    #0f3a73 0%,
-                    #2563eb 100%
-                );
-            border-radius: 20px;
-            box-shadow: 0 18px 38px rgba(37, 99, 235, 0.22);
+            padding: 30px;
+            border-radius: 26px;
+            color: #fff;
+            background: linear-gradient(135deg, #0f3d88 0%, #2563eb 55%, #3b82f6 100%);
+            box-shadow: 0 18px 40px rgba(37, 99, 235, 0.22);
         }
 
-        .welcome-card::after {
-            content: "🐾";
+        .hero::after {
+            content: "";
             position: absolute;
-            right: 35px;
-            bottom: -48px;
-            font-size: 180px;
-            opacity: 0.07;
-            transform: rotate(-17deg);
-            pointer-events: none;
+            right: -70px;
+            bottom: -70px;
+            width: 240px;
+            height: 240px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.08);
         }
 
-        .welcome-content,
-        .welcome-summary {
+        .hero::before {
+            content: "";
+            position: absolute;
+            right: 90px;
+            top: 50px;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .hero-content,
+        .hero-side {
             position: relative;
             z-index: 2;
         }
 
-        .welcome-label {
+        .hero-label {
             display: inline-block;
-            margin-bottom: 9px;
-            color: #bfdbfe;
+            margin-bottom: 10px;
+            color: #dbeafe;
             font-size: 12px;
             font-weight: 900;
-            letter-spacing: 0.13em;
+            letter-spacing: 0.12em;
             text-transform: uppercase;
         }
 
-        .welcome-card h2 {
-            font-size: 31px;
-            line-height: 1.2;
+        .hero h2 {
+            font-size: 36px;
+            line-height: 1.15;
+            margin-bottom: 10px;
         }
 
-        .welcome-card p {
-            max-width: 720px;
-            margin-top: 9px;
-            color: rgba(255, 255, 255, 0.9);
-            line-height: 1.65;
+        .hero p {
+            max-width: 760px;
+            color: rgba(255, 255, 255, 0.92);
+            line-height: 1.7;
+            font-size: 15px;
         }
 
-        .welcome-summary {
-            min-width: 180px;
-            padding: 18px 21px;
+        .hero-actions {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 22px;
+        }
+
+        .btn {
+            min-height: 46px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 18px;
+            border-radius: 12px;
+            font-weight: 800;
+            font-size: 14px;
+            transition:
+                transform 0.2s ease,
+                background-color 0.2s ease;
+        }
+
+        .btn-primary {
+            color: #0f172a;
+            background: #ffffff;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            background: #eff6ff;
+        }
+
+        .btn-outline {
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.22);
+        }
+
+        .btn-outline:hover {
+            transform: translateY(-2px);
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .hero-side {
+            display: grid;
+            gap: 14px;
+            align-content: start;
+        }
+
+        .side-card {
+            padding: 20px 18px;
             text-align: center;
-            background: rgba(255, 255, 255, 0.13);
-            border: 1px solid rgba(255, 255, 255, 0.23);
-            border-radius: 16px;
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.14);
+            border: 1px solid rgba(255, 255, 255, 0.18);
             backdrop-filter: blur(8px);
         }
 
-        .welcome-summary strong {
+        .side-card strong {
             display: block;
             font-size: 30px;
             line-height: 1;
+            margin-bottom: 8px;
         }
 
-        .welcome-summary span {
+        .side-card span {
             display: block;
-            margin-top: 8px;
-            color: rgba(255, 255, 255, 0.86);
+            color: rgba(255, 255, 255, 0.88);
             font-size: 13px;
         }
 
         /* =========================
-           INDICADORES
+           STATS
         ========================= */
 
         .stats-grid {
@@ -571,25 +698,25 @@ $horaActual = date('H:i');
         }
 
         .stat-card {
-            min-height: 128px;
             display: flex;
             align-items: center;
             gap: 15px;
+            min-height: 122px;
             padding: 20px;
             background: var(--surface);
             border: 1px solid var(--border);
-            border-radius: var(--radius);
-            box-shadow: var(--shadow);
+            border-radius: 20px;
+            box-shadow: var(--shadow-sm);
         }
 
         .stat-icon {
-            width: 52px;
-            height: 52px;
-            flex: 0 0 52px;
+            width: 56px;
+            height: 56px;
             display: grid;
             place-items: center;
-            border-radius: 14px;
-            font-size: 24px;
+            border-radius: 16px;
+            font-size: 25px;
+            flex: 0 0 56px;
         }
 
         .stat-icon.blue {
@@ -602,172 +729,289 @@ $horaActual = date('H:i');
             background: #dcfce7;
         }
 
+        .stat-icon.violet {
+            color: #6d28d9;
+            background: #ede9fe;
+        }
+
         .stat-icon.orange {
             color: #b45309;
             background: #fef3c7;
         }
 
-        .stat-icon.purple {
-            color: #6d28d9;
-            background: #ede9fe;
-        }
-
-        .stat-card span {
+        .stat-info small {
             display: block;
-            color: var(--muted);
+            color: #64748b;
             font-size: 12px;
-            font-weight: 700;
+            font-weight: 800;
+            letter-spacing: 0.03em;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
         }
 
-        .stat-card strong {
+        .stat-info strong {
             display: block;
-            margin-top: 4px;
-            color: var(--text);
-            font-size: 21px;
-            line-height: 1.2;
+            margin-top: 6px;
+            color: #0f172a;
+            font-size: 17px;
+            line-height: 1.3;
+        }
+
+        .stat-info span {
+            display: block;
+            margin-top: 5px;
+            color: #64748b;
+            font-size: 13px;
         }
 
         /* =========================
-           MÓDULOS
+           SECTIONS
         ========================= */
 
         .section-header {
             display: flex;
-            align-items: end;
+            align-items: flex-end;
             justify-content: space-between;
-            gap: 25px;
+            gap: 16px;
             margin-bottom: 16px;
         }
 
-        .section-header h2 {
+        .section-header h3 {
             color: var(--text);
             font-size: 22px;
         }
 
         .section-header p {
-            margin-top: 4px;
+            margin-top: 5px;
             color: var(--muted);
             font-size: 14px;
         }
 
-        .module-list {
+        .module-grid {
             display: grid;
-            grid-template-columns: 1fr;
-            gap: 13px;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 18px;
+            margin-bottom: 28px;
         }
 
-        .module-row {
-            position: relative;
-            overflow: hidden;
-            min-height: 112px;
-            display: grid;
-            grid-template-columns: 64px minmax(0, 1fr) auto;
-            align-items: center;
-            gap: 20px;
-            padding: 20px 22px;
+        .module-card {
+            display: flex;
+            flex-direction: column;
+            min-height: 220px;
+            padding: 22px;
             background: var(--surface);
             border: 1px solid var(--border);
-            border-left: 4px solid var(--primary);
-            border-radius: 15px;
-            box-shadow: var(--shadow);
+            border-radius: 22px;
+            box-shadow: var(--shadow-sm);
             transition:
                 transform 0.22s ease,
-                border-color 0.22s ease,
-                box-shadow 0.22s ease;
+                box-shadow 0.22s ease,
+                border-color 0.22s ease;
         }
 
-        .module-row:hover {
-            transform: translateX(5px);
-            border-color: #93b4ef;
-            border-left-color: var(--primary-dark);
-            box-shadow: 0 16px 34px rgba(37, 99, 235, 0.13);
+        .module-card:hover {
+            transform: translateY(-4px);
+            border-color: #bfdbfe;
+            box-shadow: var(--shadow-md);
         }
 
-        .module-row.disabled {
-            opacity: 0.58;
-            cursor: not-allowed;
-            border-left-color: #94a3b8;
+        .module-card.disabled {
+            opacity: 0.72;
         }
 
-        .module-row.disabled:hover {
-            transform: none;
-            border-color: var(--border);
-            border-left-color: #94a3b8;
-            box-shadow: var(--shadow);
+        .module-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 16px;
         }
 
-        .module-icon {
-            width: 60px;
-            height: 60px;
+        .module-badge {
+            width: 58px;
+            height: 58px;
             display: grid;
             place-items: center;
-            border-radius: 15px;
-            background: var(--primary-soft);
-            font-size: 29px;
+            border-radius: 18px;
+            background: #eff6ff;
+            font-size: 28px;
         }
 
-        .module-info h3 {
+        .module-status {
+            padding: 7px 11px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .status-active {
+            color: #166534;
+            background: #dcfce7;
+        }
+
+        .status-disabled {
+            color: #92400e;
+            background: #fef3c7;
+        }
+
+        .module-card h4 {
+            font-size: 19px;
             color: var(--text);
-            font-size: 18px;
+            margin-bottom: 8px;
         }
 
-        .module-info p {
-            margin-top: 6px;
+        .module-card p {
             color: var(--muted);
+            line-height: 1.65;
             font-size: 14px;
-            line-height: 1.5;
+            margin-bottom: 18px;
         }
 
-        .module-action {
-            min-width: 145px;
-            min-height: 42px;
+        .module-actions {
+            margin-top: auto;
+        }
+
+        .module-button,
+        .module-button-disabled {
+            width: 100%;
+            min-height: 46px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
             gap: 8px;
-            padding: 10px 15px;
-            color: #ffffff;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 800;
+        }
+
+        .module-button {
+            color: #fff;
             background: var(--primary);
-            border-radius: 10px;
-            font-size: 13px;
-            font-weight: 850;
-            white-space: nowrap;
             transition:
                 background-color 0.2s ease,
                 transform 0.2s ease;
         }
 
-        .module-row:hover .module-action {
-            transform: translateX(2px);
+        .module-button:hover {
             background: var(--primary-dark);
+            transform: translateY(-2px);
         }
 
-        .module-row.disabled .module-action {
-            color: #475569;
+        .module-button-disabled {
+            color: #64748b;
             background: #e2e8f0;
+            cursor: not-allowed;
+        }
+
+        .bottom-grid {
+            display: grid;
+            grid-template-columns: 1.1fr 0.9fr;
+            gap: 18px;
+        }
+
+        .info-card {
+            padding: 22px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 22px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .summary-list,
+        .quick-list {
+            display: grid;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .summary-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 14px 16px;
+            background: var(--surface-soft);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+        }
+
+        .summary-item span {
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        .summary-item strong {
+            color: var(--text);
+            font-size: 14px;
+            text-align: right;
+        }
+
+        .quick-link {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 15px 16px;
+            background: var(--surface-soft);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            transition:
+                transform 0.2s ease,
+                border-color 0.2s ease,
+                background-color 0.2s ease;
+        }
+
+        .quick-link:hover {
+            transform: translateX(4px);
+            border-color: #bfdbfe;
+            background: #f8fbff;
+        }
+
+        .quick-number {
+            width: 30px;
+            height: 30px;
+            display: grid;
+            place-items: center;
+            border-radius: 50%;
+            color: #1d4ed8;
+            background: #dbeafe;
+            font-size: 13px;
+            font-weight: 900;
+            flex: 0 0 30px;
+        }
+
+        .footer-note {
+            margin-top: 24px;
+            text-align: center;
+            color: var(--muted);
+            font-size: 13px;
         }
 
         /* =========================
            RESPONSIVE
         ========================= */
 
-        @media (max-width: 1150px) {
+        @media (max-width: 1200px) {
             .stats-grid {
                 grid-template-columns: repeat(2, minmax(0, 1fr));
             }
+
+            .module-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .bottom-grid {
+                grid-template-columns: 1fr;
+            }
         }
 
-        @media (max-width: 900px) {
+        @media (max-width: 980px) {
             .app-layout {
                 grid-template-columns: 1fr;
             }
 
             .sidebar {
                 position: fixed;
-                left: -290px;
-                width: 280px;
+                left: -300px;
+                width: 290px;
                 transition: left 0.25s ease;
             }
 
@@ -775,67 +1019,54 @@ $horaActual = date('H:i');
                 left: 0;
             }
 
-            .main-content {
-                padding-inline: 20px;
-            }
-
             .menu-button {
                 display: inline-grid;
                 place-items: center;
             }
 
-            .welcome-card {
+            .main-content {
+                padding: 22px 18px 36px;
+            }
+
+            .hero {
                 grid-template-columns: 1fr;
             }
 
-            .welcome-summary {
-                width: fit-content;
+            .hero-side {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
             }
         }
 
-        @media (max-width: 650px) {
-            .main-content {
-                padding: 0 14px 35px;
-            }
-
+        @media (max-width: 700px) {
             .topbar {
-                align-items: flex-start;
                 flex-direction: column;
-                justify-content: center;
-                gap: 12px;
-                padding: 14px 0;
+                align-items: flex-start;
             }
 
-            .topbar-status {
-                align-self: stretch;
-                justify-content: center;
+            .page-title h1 {
+                font-size: 24px;
             }
 
-            .welcome-card {
-                padding: 25px 22px;
+            .hero {
+                padding: 24px 20px;
             }
 
-            .welcome-card h2 {
-                font-size: 25px;
+            .hero h2 {
+                font-size: 28px;
             }
 
-            .stats-grid {
+            .hero-side {
+                grid-template-columns: 1fr;
+            }
+
+            .stats-grid,
+            .module-grid {
                 grid-template-columns: 1fr;
             }
 
             .section-header {
-                align-items: flex-start;
                 flex-direction: column;
-            }
-
-            .module-row {
-                grid-template-columns: 1fr;
-                justify-items: center;
-                text-align: center;
-            }
-
-            .module-action {
-                width: 100%;
+                align-items: flex-start;
             }
         }
     </style>
@@ -856,14 +1087,14 @@ $horaActual = date('H:i');
             </div>
         </div>
 
-        <div class="sidebar-label">
-            Navegación
+        <div class="nav-title">
+            Menú principal
         </div>
 
         <nav class="sidebar-nav">
 
             <a class="sidebar-link active" href="panel.php">
-                <span class="sidebar-icon">▦</span>
+                <span class="sidebar-icon">🏠</span>
                 Dashboard
             </a>
 
@@ -884,10 +1115,7 @@ $horaActual = date('H:i');
 
                 <?php else: ?>
 
-                    <span
-                        class="sidebar-link disabled"
-                        title="Archivo principal no encontrado"
-                    >
+                    <span class="sidebar-link-disabled">
                         <span class="sidebar-icon">
                             <?= e($modulo['icono']) ?>
                         </span>
@@ -903,28 +1131,18 @@ $horaActual = date('H:i');
 
         <div class="sidebar-footer">
 
-            <div class="sidebar-user">
-
-                <div class="sidebar-avatar">
-                    <?= e(strtoupper(substr($nombreUsuario, 0, 1))) ?>
+            <div class="user-card">
+                <div class="user-avatar">
+                    <?= e($inicial) ?>
                 </div>
 
                 <div>
-                    <strong>
-                        <?= e($nombreUsuario) ?>
-                    </strong>
-
-                    <span>
-                        <?= e($rolUsuario) ?>
-                    </span>
+                    <strong><?= e($nombreUsuario) ?></strong>
+                    <span><?= e($rolUsuario) ?></span>
                 </div>
-
             </div>
 
-            <a
-                class="logout-button"
-                href="logout.php"
-            >
+            <a class="logout-button" href="logout.php">
                 🚪 Cerrar sesión
             </a>
 
@@ -949,48 +1167,80 @@ $horaActual = date('H:i');
 
                 <div class="page-title">
                     <h1>Dashboard</h1>
-
-                    <p>
-                        Administración general del sistema veterinario
-                    </p>
+                    <p>Administración general del sistema veterinario</p>
                 </div>
 
             </div>
 
-            <div class="topbar-status">
-                <span class="status-dot"></span>
-                Sistema operativo
+            <div class="topbar-badges">
+
+                <div class="badge badge-success">
+                    <span class="dot"></span>
+                    Sistema operativo
+                </div>
+
+                <div class="badge badge-primary">
+                    📅 <?= e($fechaActual) ?> · <?= e($horaActual) ?>
+                </div>
+
             </div>
 
         </header>
 
-        <section class="welcome-card">
+        <section class="hero">
 
-            <div class="welcome-content">
+            <div class="hero-content">
 
-                <span class="welcome-label">
-                    PANEL DE CONTROL
+                <span class="hero-label">
+                    Panel de control
                 </span>
 
                 <h2>
-                    Bienvenido, <?= e($nombreUsuario) ?>
+                    <?= e($saludo) ?>, <?= e($nombreUsuario) ?>
                 </h2>
 
                 <p>
                     Gestiona clientes, mascotas, citas, historias clínicas,
-                    inventario y usuarios desde una sola interfaz.
+                    inventario y usuarios desde una sola interfaz profesional,
+                    rápida y organizada.
                 </p>
+
+                <div class="hero-actions">
+
+                    <?php if ($modulos[0]['ruta'] !== null): ?>
+                        <a
+                            href="<?= e($modulos[0]['ruta']) ?>"
+                            class="btn btn-primary"
+                        >
+                            👥 Ir a Clientes
+                        </a>
+                    <?php endif; ?>
+
+                    <?php if ($modulos[2]['ruta'] !== null): ?>
+                        <a
+                            href="<?= e($modulos[2]['ruta']) ?>"
+                            class="btn btn-outline"
+                        >
+                            📅 Ver Citas
+                        </a>
+                    <?php endif; ?>
+
+                </div>
 
             </div>
 
-            <div class="welcome-summary">
-                <strong>
-                    <?= e($modulosDisponibles) ?>/<?= e($totalModulos) ?>
-                </strong>
+            <div class="hero-side">
 
-                <span>
-                    módulos disponibles
-                </span>
+                <div class="side-card">
+                    <strong><?= e((string) $modulosDisponibles) ?>/<?= e((string) $totalModulos) ?></strong>
+                    <span>Módulos disponibles</span>
+                </div>
+
+                <div class="side-card">
+                    <strong><?= e($rolUsuario) ?></strong>
+                    <span>Rol actual</span>
+                </div>
+
             </div>
 
         </section>
@@ -998,46 +1248,195 @@ $horaActual = date('H:i');
         <section class="stats-grid">
 
             <article class="stat-card">
-                <div class="stat-icon blue">▦</div>
+                <div class="stat-icon blue">📦</div>
 
-                <div>
-                    <span>Total de módulos</span>
-                    <strong><?= e($totalModulos) ?></strong>
+                <div class="stat-info">
+                    <small>Total de módulos</small>
+                    <strong><?= e((string) $totalModulos) ?></strong>
+                    <span>Áreas registradas en el sistema</span>
                 </div>
             </article>
 
             <article class="stat-card">
-                <div class="stat-icon green">✓</div>
+                <div class="stat-icon green">✅</div>
 
-                <div>
-                    <span>Módulos disponibles</span>
-                    <strong><?= e($modulosDisponibles) ?></strong>
+                <div class="stat-info">
+                    <small>Módulos activos</small>
+                    <strong><?= e((string) $modulosDisponibles) ?></strong>
+                    <span>Listos para ser utilizados</span>
                 </div>
             </article>
 
             <article class="stat-card">
-                <div class="stat-icon purple">👤</div>
+                <div class="stat-icon violet">👤</div>
 
-                <div>
-                    <span>Rol actual</span>
-                    <strong><?= e(ucfirst($rolUsuario)) ?></strong>
+                <div class="stat-info">
+                    <small>Rol actual</small>
+                    <strong><?= e($rolUsuario) ?></strong>
+                    <span>Permisos asignados al usuario</span>
                 </div>
             </article>
 
             <article class="stat-card">
                 <div class="stat-icon orange">🕐</div>
 
-                <div>
-                    <span>Fecha y hora</span>
-                    <strong>
-                        <?= e($fechaActual) ?> · <?= e($horaActual) ?>
-                    </strong>
+                <div class="stat-info">
+                    <small>Fecha y hora</small>
+                    <strong><?= e($fechaActual) ?> · <?= e($horaActual) ?></strong>
+                    <span>Última actualización visual</span>
                 </div>
             </article>
 
         </section>
 
-       
+        <section>
+
+            <div class="section-header">
+                <div>
+                    <h3>Módulos principales</h3>
+                    <p>Accede rápidamente a las funciones más importantes del sistema.</p>
+                </div>
+            </div>
+
+            <div class="module-grid">
+
+                <?php foreach ($modulos as $modulo): ?>
+                    <article class="module-card <?= $modulo['ruta'] === null ? 'disabled' : '' ?>">
+
+                        <div class="module-top">
+                            <div class="module-badge">
+                                <?= e($modulo['icono']) ?>
+                            </div>
+
+                            <?php if ($modulo['ruta'] !== null): ?>
+                                <span class="module-status status-active">
+                                    Disponible
+                                </span>
+                            <?php else: ?>
+                                <span class="module-status status-disabled">
+                                    No disponible
+                                </span>
+                            <?php endif; ?>
+                        </div>
+
+                        <h4><?= e($modulo['titulo']) ?></h4>
+
+                        <p><?= e($modulo['descripcion']) ?></p>
+
+                        <div class="module-actions">
+
+                            <?php if ($modulo['ruta'] !== null): ?>
+                                <a
+                                    href="<?= e($modulo['ruta']) ?>"
+                                    class="module-button"
+                                >
+                                    Abrir módulo →
+                                </a>
+                            <?php else: ?>
+                                <span class="module-button-disabled">
+                                    Archivo no encontrado
+                                </span>
+                            <?php endif; ?>
+
+                        </div>
+
+                    </article>
+                <?php endforeach; ?>
+
+            </div>
+
+        </section>
+
+        <section class="bottom-grid">
+
+            <div class="info-card">
+
+                <div class="section-header">
+                    <div>
+                        <h3>Resumen del sistema</h3>
+                        <p>Información general de la sesión actual.</p>
+                    </div>
+                </div>
+
+                <div class="summary-list">
+
+                    <div class="summary-item">
+                        <span>Nombre del sistema</span>
+                        <strong>Clínica Veterinaria El Campo</strong>
+                    </div>
+
+                    <div class="summary-item">
+                        <span>Usuario activo</span>
+                        <strong><?= e($nombreUsuario) ?></strong>
+                    </div>
+
+                    <div class="summary-item">
+                        <span>Rol asignado</span>
+                        <strong><?= e($rolUsuario) ?></strong>
+                    </div>
+
+                    <div class="summary-item">
+                        <span>Módulos disponibles</span>
+                        <strong><?= e((string) $modulosDisponibles) ?> de <?= e((string) $totalModulos) ?></strong>
+                    </div>
+
+                    <div class="summary-item">
+                        <span>Módulos no disponibles</span>
+                        <strong><?= e((string) $modulosNoDisponibles) ?></strong>
+                    </div>
+
+                </div>
+
+            </div>
+
+            <div class="info-card">
+
+                <div class="section-header">
+                    <div>
+                        <h3>Acciones rápidas</h3>
+                        <p>Atajos para trabajar más rápido.</p>
+                    </div>
+                </div>
+
+                <div class="quick-list">
+
+                    <?php if ($modulos[0]['ruta'] !== null): ?>
+                        <a href="<?= e($modulos[0]['ruta']) ?>" class="quick-link">
+                            <span class="quick-number">1</span>
+                            Administrar clientes
+                        </a>
+                    <?php endif; ?>
+
+                    <?php if ($modulos[1]['ruta'] !== null): ?>
+                        <a href="<?= e($modulos[1]['ruta']) ?>" class="quick-link">
+                            <span class="quick-number">2</span>
+                            Revisar mascotas
+                        </a>
+                    <?php endif; ?>
+
+                    <?php if ($modulos[2]['ruta'] !== null): ?>
+                        <a href="<?= e($modulos[2]['ruta']) ?>" class="quick-link">
+                            <span class="quick-number">3</span>
+                            Consultar citas
+                        </a>
+                    <?php endif; ?>
+
+                    <?php if ($modulos[4]['ruta'] !== null): ?>
+                        <a href="<?= e($modulos[4]['ruta']) ?>" class="quick-link">
+                            <span class="quick-number">4</span>
+                            Ver inventario
+                        </a>
+                    <?php endif; ?>
+
+                </div>
+
+            </div>
+
+        </section>
+
+        <p class="footer-note">
+            © <?= e((string) $anioActual) ?> Clínica Veterinaria El Campo · Panel administrativo
+        </p>
 
     </main>
 
@@ -1057,10 +1456,7 @@ $horaActual = date('H:i');
                 sidebar.contains(event.target) ||
                 menuButton.contains(event.target);
 
-            if (
-                window.innerWidth <= 900 &&
-                !clickDentroMenu
-            ) {
+            if (window.innerWidth <= 980 && !clickDentroMenu) {
                 sidebar.classList.remove('open');
             }
         });

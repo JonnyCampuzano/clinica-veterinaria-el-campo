@@ -3,14 +3,22 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/config/app.php';
 
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    session_start();
+}
+
 /*
 |--------------------------------------------------------------------------
 | EVITAR REGRESAR AL LOGIN SI YA EXISTE UNA SESIÓN
 |--------------------------------------------------------------------------
 */
 
-if (!empty($_SESSION['usuario_id'])) {
+if (
+    !empty($_SESSION['usuario_id']) ||
+    !empty($_SESSION['id_usuario'])
+) {
     redirect('panel.php');
+    exit;
 }
 
 /*
@@ -20,8 +28,21 @@ if (!empty($_SESSION['usuario_id'])) {
 */
 
 $error = trim((string) ($_GET['error'] ?? ''));
-$msg   = trim((string) ($_GET['msg'] ?? ''));
+$msg = trim((string) ($_GET['msg'] ?? ''));
+
+$errorLogin = trim(
+    (string) ($_SESSION['error_login'] ?? '')
+);
+
+/*
+|--------------------------------------------------------------------------
+| ELIMINAR MENSAJE DE SESIÓN DESPUÉS DE LEERLO
+|--------------------------------------------------------------------------
+*/
+
+unset($_SESSION['error_login']);
 ?>
+
 <!DOCTYPE html>
 <html lang="es">
 
@@ -45,16 +66,12 @@ $msg   = trim((string) ($_GET['msg'] ?? ''));
             display: block;
             margin-top: 14px;
             padding: 15px;
-
             background: #10b981;
             color: #ffffff;
-
             text-align: center;
             text-decoration: none;
-            font-weight: bold;
-
+            font-weight: 700;
             border-radius: 10px;
-
             transition:
                 background-color 0.25s ease,
                 transform 0.25s ease;
@@ -65,28 +82,26 @@ $msg   = trim((string) ($_GET['msg'] ?? ''));
             transform: translateY(-2px);
         }
 
-        .alert {
-            margin-bottom: 18px;
-            padding: 14px;
-
-            background: #fee2e2;
-            border: 1px solid #fecaca;
-            border-radius: 10px;
-
-            color: #991b1b;
-            text-align: center;
-        }
-
+        .alert,
         .alert-success {
             margin-bottom: 18px;
             padding: 14px;
+            border-radius: 10px;
+            text-align: center;
+            font-size: 14px;
+            line-height: 1.5;
+        }
 
+        .alert {
+            background: #fee2e2;
+            border: 1px solid #fecaca;
+            color: #991b1b;
+        }
+
+        .alert-success {
             background: #dcfce7;
             border: 1px solid #bbf7d0;
-            border-radius: 10px;
-
             color: #166534;
-            text-align: center;
         }
     </style>
 </head>
@@ -99,16 +114,27 @@ $msg   = trim((string) ($_GET['msg'] ?? ''));
     <section class="login-hero">
 
         <div class="brand">
-            <div class="brand-icon">🐾</div>
-            <h1>Sistema Veterinario</h1>
+
+            <div class="brand-icon">
+                🐾
+            </div>
+
+            <h1>
+                Sistema Veterinario
+            </h1>
+
         </div>
 
         <div class="welcome">
-            <h2>Bienvenido</h2>
+
+            <h2>
+                Bienvenido
+            </h2>
 
             <p>
                 Inicie sesión para acceder al sistema.
             </p>
+
         </div>
 
         <img
@@ -123,26 +149,44 @@ $msg   = trim((string) ($_GET['msg'] ?? ''));
     <section class="login-panel">
 
         <form
-    action="procesar_login.php"
-    method="POST"
-    class="login-card"
-    autocomplete="on"
->
+            action="<?= e(url('procesar_login.php')) ?>"
+            method="post"
+            class="login-card"
+            autocomplete="on"
+        >
 
-            <div class="lock-icon">🔒</div>
+            <div class="lock-icon">
+                🔒
+            </div>
 
-            <h2>Iniciar sesión</h2>
+            <h2>
+                Iniciar sesión
+            </h2>
 
-            <?php if ($msg === 'password_actualizada'): ?>
+            <?php if ($errorLogin !== ''): ?>
+
+                <div class="alert">
+                    <?= e($errorLogin) ?>
+                </div>
+
+            <?php endif; ?>
+
+            <?php if (isset($_GET['contrasena_actualizada'])): ?>
+
                 <div class="alert-success">
                     Contraseña actualizada correctamente.
+                    Ya puede iniciar sesión.
                 </div>
+
             <?php endif; ?>
 
             <?php if ($msg === 'registro_exitoso'): ?>
+
                 <div class="alert-success">
-                    Usuario registrado correctamente. Ya puede iniciar sesión.
+                    Usuario registrado correctamente.
+                    Ya puede iniciar sesión.
                 </div>
+
             <?php endif; ?>
 
             <?php if ($error === 'campos_vacios'): ?>
@@ -184,7 +228,8 @@ $msg   = trim((string) ($_GET['msg'] ?? ''));
             <?php elseif ($error === 'sistema'): ?>
 
                 <div class="alert">
-                    Ocurrió un error en el sistema. Intente nuevamente.
+                    Ocurrió un error en el sistema.
+                    Intente nuevamente.
                 </div>
 
             <?php endif; ?>
@@ -198,6 +243,7 @@ $msg   = trim((string) ($_GET['msg'] ?? ''));
                 id="correo"
                 name="correo"
                 placeholder="Ingrese su correo"
+                maxlength="150"
                 autocomplete="email"
                 required
             >
@@ -218,6 +264,7 @@ $msg   = trim((string) ($_GET['msg'] ?? ''));
             <div class="options">
 
                 <label class="remember">
+
                     <input
                         type="checkbox"
                         name="recordarme"
@@ -225,9 +272,12 @@ $msg   = trim((string) ($_GET['msg'] ?? ''));
                     >
 
                     Recordarme
+
                 </label>
 
-                <a href="<?= e(url('recuperar.php')) ?>">
+                <a
+                    href="<?= e(url('recuperar_contrasena.php')) ?>"
+                >
                     ¿Olvidó su contraseña?
                 </a>
 
@@ -237,9 +287,8 @@ $msg   = trim((string) ($_GET['msg'] ?? ''));
                 Ingresar
             </button>
 
-            <!-- En tu estructura el archivo se llama registrar.php -->
             <a
-                href="<?= e(url('registrar.php')) ?>"
+                href="<?= e(url('registrar_usuario.php')) ?>"
                 class="boton-registrar-login"
             >
                 Registrar nuevo usuario
@@ -258,4 +307,5 @@ $msg   = trim((string) ($_GET['msg'] ?? ''));
 <script src="<?= e(url('assets/js/app.js')) ?>"></script>
 
 </body>
+
 </html>
