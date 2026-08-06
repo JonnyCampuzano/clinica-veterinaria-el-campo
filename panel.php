@@ -1,54 +1,43 @@
 <?php
 declare(strict_types=1);
 
+error_reporting(E_ALL);
+ini_set('display_errors', '1');
+
 require_once __DIR__ . '/config/app.php';
-
-if (session_status() !== PHP_SESSION_ACTIVE) {
-    session_start();
-}
+require_once __DIR__ . '/includes/auth.php';
 
 /*
 |--------------------------------------------------------------------------
-| PROTEGER EL PANEL
+| PROTEGER EL DASHBOARD MEDIANTE PERMISOS
 |--------------------------------------------------------------------------
 */
 
-$idUsuario = $_SESSION['usuario_id']
-    ?? $_SESSION['id_usuario']
-    ?? null;
+require_login();
 
-if (empty($idUsuario)) {
-    header('Location: login.php');
-    exit;
-}
+date_default_timezone_set('America/Guayaquil');
 
 /*
 |--------------------------------------------------------------------------
-| DATOS DEL USUARIO
+| DATOS DEL USUARIO AUTENTICADO
 |--------------------------------------------------------------------------
 */
+
+$usuarioActual = current_user();
 
 $nombreUsuario = trim(
-    (string) (
-        $_SESSION['nombre']
-        ?? $_SESSION['usuario']
-        ?? ''
-    )
+    (string) ($usuarioActual['nombre'] ?? '')
 );
 
 if ($nombreUsuario === '') {
     $nombreUsuario = 'Usuario';
 }
 
-$rolUsuario = trim(
-    (string) (
-        $_SESSION['rol']
-        ?? ''
-    )
-);
+$rolActual = current_role();
+$nombreRol = role_label($rolActual);
 
-if ($rolUsuario === '') {
-    $rolUsuario = 'Usuario';
+if (trim($nombreRol) === '') {
+    $nombreRol = 'Usuario';
 }
 
 /*
@@ -97,19 +86,17 @@ if (!function_exists('inicialUsuario')) {
 |--------------------------------------------------------------------------
 */
 
-$hora = (int) date('H');
+$horaActualNumero = (int) date('H');
 
-if ($hora >= 5 && $hora < 12) {
-    $saludo = 'Buenos días';
-} elseif ($hora >= 12 && $hora < 19) {
-    $saludo = 'Buenas tardes';
-} else {
-    $saludo = 'Buenas noches';
-}
+$saludo = match (true) {
+    $horaActualNumero >= 5 && $horaActualNumero < 12 => 'Buenos días',
+    $horaActualNumero >= 12 && $horaActualNumero < 19 => 'Buenas tardes',
+    default => 'Buenas noches'
+};
 
 /*
 |--------------------------------------------------------------------------
-| CONFIGURACIÓN DE LOS MÓDULOS
+| CONFIGURACIÓN DE LOS MÓDULOS Y SUS PERMISOS
 |--------------------------------------------------------------------------
 */
 
@@ -118,6 +105,7 @@ $modulos = [
         'titulo' => 'Clientes',
         'icono' => '👥',
         'descripcion' => 'Registro y administración de propietarios.',
+        'permiso' => 'clientes.ver',
         'rutas' => [
             'clientes/index.php',
             'clientes/clientes.php',
@@ -128,6 +116,7 @@ $modulos = [
         'titulo' => 'Mascotas',
         'icono' => '🐾',
         'descripcion' => 'Registro y seguimiento de mascotas.',
+        'permiso' => 'mascotas.ver',
         'rutas' => [
             'mascotas/index.php',
             'mascotas/mascotas.php',
@@ -138,6 +127,7 @@ $modulos = [
         'titulo' => 'Citas',
         'icono' => '📅',
         'descripcion' => 'Agenda y administración de citas veterinarias.',
+        'permiso' => 'citas.ver',
         'rutas' => [
             'citas/index.php',
             'citas/citas.php',
@@ -148,6 +138,7 @@ $modulos = [
         'titulo' => 'Historia Clínica',
         'icono' => '📋',
         'descripcion' => 'Consultas, diagnósticos y tratamientos.',
+        'permiso' => 'historias.ver',
         'rutas' => [
             'consultas/index.php',
             'consultas/consultas.php',
@@ -161,6 +152,7 @@ $modulos = [
         'titulo' => 'Inventario',
         'icono' => '📦',
         'descripcion' => 'Control de productos, medicamentos y existencias.',
+        'permiso' => 'inventario.ver',
         'rutas' => [
             'inventario/index.php',
             'inventario/inventario.php',
@@ -171,6 +163,7 @@ $modulos = [
         'titulo' => 'Usuarios',
         'icono' => '🔐',
         'descripcion' => 'Administración de usuarios, roles y permisos.',
+        'permiso' => 'usuarios.ver',
         'rutas' => [
             'usuarios/index.php',
             'usuarios/usuarios.php',
@@ -181,19 +174,23 @@ $modulos = [
 
 /*
 |--------------------------------------------------------------------------
-| ASIGNAR RUTAS DISPONIBLES
+| APLICAR LOS PERMISOS DEL ROL ACTUAL
 |--------------------------------------------------------------------------
 */
 
 $modulosDisponibles = 0;
-
 foreach ($modulos as $indice => $modulo) {
+    $permitido = can($modulo['permiso']);
     $rutaEncontrada = encontrarRuta($modulo['rutas']);
-    $modulos[$indice]['ruta'] = $rutaEncontrada;
 
-    if ($rutaEncontrada !== null) {
+    $modulos[$indice]['permitido'] = $permitido;
+    $modulos[$indice]['archivo_disponible'] = $rutaEncontrada !== null;
+    $modulos[$indice]['ruta'] = $permitido ? $rutaEncontrada : null;
+
+    if ($permitido) {
         $modulosDisponibles++;
     }
+
 }
 
 $totalModulos = count($modulos);
@@ -1100,6 +1097,8 @@ $inicial = inicialUsuario($nombreUsuario);
 
             <?php foreach ($modulos as $modulo): ?>
 
+                <?php if (!$modulo['permitido']) continue; ?>
+
                 <?php if ($modulo['ruta'] !== null): ?>
 
                     <a
@@ -1138,7 +1137,7 @@ $inicial = inicialUsuario($nombreUsuario);
 
                 <div>
                     <strong><?= e($nombreUsuario) ?></strong>
-                    <span><?= e($rolUsuario) ?></span>
+                    <span><?= e($nombreRol) ?></span>
                 </div>
             </div>
 
@@ -1233,11 +1232,11 @@ $inicial = inicialUsuario($nombreUsuario);
 
                 <div class="side-card">
                     <strong><?= e((string) $modulosDisponibles) ?>/<?= e((string) $totalModulos) ?></strong>
-                    <span>Módulos disponibles</span>
+                    <span>Módulos permitidos para tu rol</span>
                 </div>
 
                 <div class="side-card">
-                    <strong><?= e($rolUsuario) ?></strong>
+                    <strong><?= e($nombreRol) ?></strong>
                     <span>Rol actual</span>
                 </div>
 
@@ -1261,9 +1260,9 @@ $inicial = inicialUsuario($nombreUsuario);
                 <div class="stat-icon green">✅</div>
 
                 <div class="stat-info">
-                    <small>Módulos activos</small>
+                    <small>Módulos permitidos</small>
                     <strong><?= e((string) $modulosDisponibles) ?></strong>
-                    <span>Listos para ser utilizados</span>
+                    <span>Según los permisos de tu rol</span>
                 </div>
             </article>
 
@@ -1272,7 +1271,7 @@ $inicial = inicialUsuario($nombreUsuario);
 
                 <div class="stat-info">
                     <small>Rol actual</small>
-                    <strong><?= e($rolUsuario) ?></strong>
+                    <strong><?= e($nombreRol) ?></strong>
                     <span>Permisos asignados al usuario</span>
                 </div>
             </article>
@@ -1301,6 +1300,8 @@ $inicial = inicialUsuario($nombreUsuario);
             <div class="module-grid">
 
                 <?php foreach ($modulos as $modulo): ?>
+                    <?php if (!$modulo['permitido']) continue; ?>
+
                     <article class="module-card <?= $modulo['ruta'] === null ? 'disabled' : '' ?>">
 
                         <div class="module-top">
@@ -1334,7 +1335,7 @@ $inicial = inicialUsuario($nombreUsuario);
                                 </a>
                             <?php else: ?>
                                 <span class="module-button-disabled">
-                                    Archivo no encontrado
+                                    Módulo sin archivo de entrada
                                 </span>
                             <?php endif; ?>
 
@@ -1372,16 +1373,16 @@ $inicial = inicialUsuario($nombreUsuario);
 
                     <div class="summary-item">
                         <span>Rol asignado</span>
-                        <strong><?= e($rolUsuario) ?></strong>
+                        <strong><?= e($nombreRol) ?></strong>
                     </div>
 
                     <div class="summary-item">
-                        <span>Módulos disponibles</span>
+                        <span>Módulos permitidos para tu rol</span>
                         <strong><?= e((string) $modulosDisponibles) ?> de <?= e((string) $totalModulos) ?></strong>
                     </div>
 
                     <div class="summary-item">
-                        <span>Módulos no disponibles</span>
+                        <span>Módulos sin permiso</span>
                         <strong><?= e((string) $modulosNoDisponibles) ?></strong>
                     </div>
 

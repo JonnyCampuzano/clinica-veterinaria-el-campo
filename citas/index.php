@@ -1,8 +1,10 @@
 <?php
 declare(strict_types=1);
 
-require_once __DIR__ . '/../includes/auth.php';
-require_login();
+require_once dirname(__DIR__, 2)
+    . '/includes/auth.php';
+
+require_permission('citas.ver');
 
 $estado = trim($_GET['estado'] ?? '');
 $sql = "SELECT c.*, m.nombre AS mascota,

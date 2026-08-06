@@ -8,14 +8,6 @@ declare(strict_types=1);
 $raiz = dirname(__DIR__);
 
 /* =====================================================
-   INICIAR SESIÓN
-===================================================== */
-
-if (session_status() !== PHP_SESSION_ACTIVE) {
-    session_start();
-}
-
-/* =====================================================
    CARGAR ARCHIVOS DEL SISTEMA
 ===================================================== */
 
@@ -25,16 +17,20 @@ require_once $raiz . '/config/conexion.php';
 require_once $raiz . '/includes/auth.php';
 
 /* =====================================================
-   VALIDAR USUARIO
+   VALIDAR SESIÓN Y PERMISO
 ===================================================== */
 
-require_login();
+require_permission('clientes.ver');
+
+$puedeCrear = can('clientes.crear');
+$puedeEditar = can('clientes.editar');
+$puedeEliminar = can('clientes.eliminar');
 
 /* =====================================================
-   CREAR TOKEN DE SEGURIDAD PARA ELIMINAR
+   CREAR TOKEN CSRF PARA ELIMINAR
 ===================================================== */
 
-if (empty($_SESSION['csrf_clientes'])) {
+if ($puedeEliminar && empty($_SESSION['csrf_clientes'])) {
     $_SESSION['csrf_clientes'] = bin2hex(
         random_bytes(32)
     );
@@ -62,15 +58,30 @@ if (!isset($pdo) || !($pdo instanceof PDO)) {
 }
 
 /* =====================================================
-   BUSCADOR
+   BUSCADOR Y MENSAJES
 ===================================================== */
 
 $buscar = trim(
     (string) ($_GET['buscar'] ?? '')
 );
 
+$mensaje = trim(
+    (string) ($_GET['msg'] ?? '')
+);
+
 $clientes = [];
 $mensajeError = '';
+$mensajeExito = '';
+
+$mensajesExito = [
+    'registrado' => 'El cliente fue registrado correctamente.',
+    'actualizado' => 'El cliente fue actualizado correctamente.',
+    'eliminado' => 'El cliente fue eliminado correctamente.'
+];
+
+if (isset($mensajesExito[$mensaje])) {
+    $mensajeExito = $mensajesExito[$mensaje];
+}
 
 /* =====================================================
    CONSULTAR CLIENTES
@@ -103,16 +114,19 @@ try {
                 OR c.cedula LIKE :buscar_cedula
                 OR c.telefono LIKE :buscar_telefono
                 OR c.email LIKE :buscar_email
+                OR CONCAT_WS(" ", c.nombres, c.apellidos)
+                    LIKE :buscar_nombre_completo
         ';
 
         $termino = '%' . $buscar . '%';
 
         $parametros = [
-            'buscar_nombres' => $termino,
-            'buscar_apellidos' => $termino,
-            'buscar_cedula' => $termino,
-            'buscar_telefono' => $termino,
-            'buscar_email' => $termino
+            ':buscar_nombres' => $termino,
+            ':buscar_apellidos' => $termino,
+            ':buscar_cedula' => $termino,
+            ':buscar_telefono' => $termino,
+            ':buscar_email' => $termino,
+            ':buscar_nombre_completo' => $termino
         ];
     }
 
@@ -179,14 +193,26 @@ require_once $raiz . '/includes/header.php';
         <?php endif; ?>
     </form>
 
-    <a
-        class="btn btn-primary"
-        href="<?= e(url('clientes/crear.php')) ?>"
-    >
-        ➕ Nuevo cliente
-    </a>
+    <?php if ($puedeCrear): ?>
+
+        <a
+            class="btn btn-primary"
+            href="<?= e(url('clientes/crear.php')) ?>"
+        >
+            ➕ Nuevo cliente
+        </a>
+
+    <?php endif; ?>
 
 </div>
+
+<?php if ($mensajeExito !== ''): ?>
+
+    <div class="alert alert-success">
+        <?= e($mensajeExito) ?>
+    </div>
+
+<?php endif; ?>
 
 <?php if ($mensajeError !== ''): ?>
 
@@ -307,53 +333,73 @@ require_once $raiz . '/includes/header.php';
 
                         <div class="actions">
 
-                            <!-- BOTÓN EDITAR -->
-                            <a
-                                class="btn btn-warning btn-sm"
-                                href="<?= e(
-                                    url(
-                                        'clientes/editar.php?id=' .
-                                        $idCliente
-                                    )
-                                ) ?>"
-                            >
-                                ✏️ Editar
-                            </a>
+                            <?php if ($puedeEditar): ?>
 
-                            <!-- FORMULARIO ELIMINAR -->
-                            <form
-                                class="inline-form"
-                                method="POST"
-                                action="<?= e(
-                                    url('clientes/eliminar.php')
-                                ) ?>"
-                                onsubmit="return confirm(
-                                    '¿Deseas eliminar este cliente?'
-                                );"
-                            >
-
-                                <input
-                                    type="hidden"
-                                    name="csrf_token"
-                                    value="<?= e(
-                                        $_SESSION['csrf_clientes']
+                                <a
+                                    class="btn btn-warning btn-sm"
+                                    href="<?= e(
+                                        url(
+                                            'clientes/editar.php?id=' .
+                                            $idCliente
+                                        )
                                     ) ?>"
                                 >
+                                    ✏️ Editar
+                                </a>
 
-                                <input
-                                    type="hidden"
-                                    name="id"
-                                    value="<?= $idCliente ?>"
+                            <?php endif; ?>
+
+                            <?php if ($puedeEliminar): ?>
+
+                                <form
+                                    class="inline-form"
+                                    method="POST"
+                                    action="<?= e(
+                                        url('clientes/eliminar.php')
+                                    ) ?>"
+                                    onsubmit="return confirm(
+                                        '¿Deseas eliminar este cliente?'
+                                    );"
                                 >
 
-                                <button
-                                    class="btn btn-danger btn-sm"
-                                    type="submit"
-                                >
-                                    🗑️ Eliminar
-                                </button>
+                                    <input
+                                        type="hidden"
+                                        name="csrf_token"
+                                        value="<?= e(
+                                            (string) (
+                                                $_SESSION['csrf_clientes']
+                                                ?? ''
+                                            )
+                                        ) ?>"
+                                    >
 
-                            </form>
+                                    <input
+                                        type="hidden"
+                                        name="id"
+                                        value="<?= $idCliente ?>"
+                                    >
+
+                                    <button
+                                        class="btn btn-danger btn-sm"
+                                        type="submit"
+                                    >
+                                        🗑️ Eliminar
+                                    </button>
+
+                                </form>
+
+                            <?php endif; ?>
+
+                            <?php if (
+                                !$puedeEditar &&
+                                !$puedeEliminar
+                            ): ?>
+
+                                <span class="badge badge-info">
+                                    Solo lectura
+                                </span>
+
+                            <?php endif; ?>
 
                         </div>
 

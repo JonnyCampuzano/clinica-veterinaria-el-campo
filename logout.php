@@ -1,23 +1,51 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/config/app.php';
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
 }
 
+/*
+|--------------------------------------------------------------------------
+| LIMPIAR SESIÓN
+|--------------------------------------------------------------------------
+*/
 
 $_SESSION = [];
 
+/*
+|--------------------------------------------------------------------------
+| ELIMINAR COOKIE DE SESIÓN
+|--------------------------------------------------------------------------
+*/
 
-session_regenerate_id(true);
+if (ini_get('session.use_cookies')) {
+    $parametros = session_get_cookie_params();
 
+    setcookie(
+        session_name(),
+        '',
+        time() - 42000,
+        $parametros['path'],
+        $parametros['domain'],
+        $parametros['secure'],
+        $parametros['httponly']
+    );
+}
 
-$_SESSION['flash'] = [
-    'type' => 'success',
-    'message' => 'Sesión cerrada correctamente.'
-];
+session_destroy();
 
+/*
+|--------------------------------------------------------------------------
+| REGRESAR AL LOGIN
+|--------------------------------------------------------------------------
+*/
 
-header('Location: login.php');
+if (function_exists('redirect')) {
+    redirect('login.php?msg=sesion_cerrada');
+}
+
+header('Location: login.php?msg=sesion_cerrada');
 exit;

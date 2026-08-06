@@ -2,17 +2,14 @@
 declare(strict_types=1);
 
 /* =====================================================
-   RUTA DEL PROYECTO
+   RUTA PRINCIPAL DEL PROYECTO
+   Este archivo debe estar en: usuarios/index.php
 ===================================================== */
 
 $raiz = dirname(__DIR__);
 
-if (session_status() !== PHP_SESSION_ACTIVE) {
-    session_start();
-}
-
 /* =====================================================
-   CARGAR ARCHIVOS
+   CARGAR ARCHIVOS DEL SISTEMA
 ===================================================== */
 
 require_once $raiz . '/config/app.php';
@@ -20,7 +17,12 @@ require_once $raiz . '/includes/funciones.php';
 require_once $raiz . '/config/conexion.php';
 require_once $raiz . '/includes/auth.php';
 
-require_login();
+/* =====================================================
+   PROTEGER EL MÓDULO
+   Solo el administrador puede acceder a Usuarios.
+===================================================== */
+
+require_role('Administrador');
 
 /* =====================================================
    FUNCIONES DE RESPALDO
@@ -53,62 +55,66 @@ if (!function_exists('url')) {
 }
 
 /* =====================================================
-   VALIDAR ADMINISTRADOR
-===================================================== */
-
-$rolActual = strtolower(
-    trim((string) ($_SESSION['rol'] ?? ''))
-);
-
-if (
-    !in_array(
-        $rolActual,
-        ['admin', 'administrador'],
-        true
-    )
-) {
-    $_SESSION['flash'] = [
-        'type' => 'error',
-        'message' => 'No tienes permiso para administrar usuarios.'
-    ];
-
-    header('Location: ' . url('panel.php'));
-    exit;
-}
-
-/* =====================================================
-   COMPROBAR CONEXIÓN
+   COMPROBAR CONEXIÓN PDO
 ===================================================== */
 
 if (!isset($pdo) || !($pdo instanceof PDO)) {
-    exit('No se encontró una conexión PDO válida.');
+    exit(
+        '<div style="
+            margin:40px;
+            padding:20px;
+            border:1px solid #fecaca;
+            border-radius:12px;
+            background:#fef2f2;
+            color:#991b1b;
+            font-family:Arial,sans-serif;
+        ">
+            <strong>Error de conexión:</strong><br><br>
+            No se encontró una conexión PDO válida.
+        </div>'
+    );
 }
 
 /* =====================================================
-   DETECTAR COLUMNAS DE LA TABLA
+   DETECTAR COLUMNAS DE LA TABLA USUARIOS
 ===================================================== */
 
-function detectar_columna_usuarios(
-    array $columnas,
-    array $opciones
-): ?string {
-    foreach ($opciones as $opcion) {
-        if (in_array($opcion, $columnas, true)) {
-            return $opcion;
+if (!function_exists('detectar_columna_usuarios')) {
+    function detectar_columna_usuarios(
+        array $columnas,
+        array $opciones
+    ): ?string {
+        foreach ($opciones as $opcion) {
+            if (in_array($opcion, $columnas, true)) {
+                return $opcion;
+            }
         }
-    }
 
-    return null;
+        return null;
+    }
 }
+
+/* =====================================================
+   VARIABLES
+===================================================== */
 
 $usuarios = [];
 $mensajeError = '';
 $buscar = trim((string) ($_GET['buscar'] ?? ''));
 
+/* =====================================================
+   CONSULTAR USUARIOS
+===================================================== */
+
 try {
     $columnasTabla = $pdo
         ->query('SHOW COLUMNS FROM usuarios')
         ->fetchAll(PDO::FETCH_COLUMN);
+
+    $columnasTabla = array_map(
+        static fn(mixed $columna): string => (string) $columna,
+        $columnasTabla
+    );
 
     $columnaId = detectar_columna_usuarios(
         $columnasTabla,
@@ -122,7 +128,7 @@ try {
 
     $columnaCorreo = detectar_columna_usuarios(
         $columnasTabla,
-        ['correo', 'email']
+        ['email', 'correo']
     );
 
     $columnaRol = detectar_columna_usuarios(
@@ -132,7 +138,7 @@ try {
 
     $columnaEstado = detectar_columna_usuarios(
         $columnasTabla,
-        ['estado']
+        ['estado', 'activo']
     );
 
     if (
@@ -141,7 +147,7 @@ try {
         $columnaCorreo === null
     ) {
         throw new RuntimeException(
-            'La tabla usuarios no tiene las columnas necesarias.'
+            'La tabla usuarios no contiene las columnas obligatorias.'
         );
     }
 
@@ -153,17 +159,13 @@ try {
 
     $campos[] = $columnaRol !== null
         ? "`{$columnaRol}` AS rol"
-        : "'Usuario' AS rol";
+        : "'Sin rol' AS rol";
 
     $campos[] = $columnaEstado !== null
         ? "`{$columnaEstado}` AS estado"
         : "'Activo' AS estado";
 
-    $sql = '
-        SELECT ' . implode(', ', $campos) . '
-        FROM usuarios
-    ';
-
+    $sql = 'SELECT ' . implode(', ', $campos) . ' FROM usuarios';
     $parametros = [];
 
     if ($buscar !== '') {
@@ -175,19 +177,21 @@ try {
         $termino = '%' . $buscar . '%';
 
         $parametros = [
-            'buscar_nombre' => $termino,
-            'buscar_correo' => $termino
+            ':buscar_nombre' => $termino,
+            ':buscar_correo' => $termino
         ];
 
         if ($columnaRol !== null) {
-            $condiciones[] =
-                "`{$columnaRol}` LIKE :buscar_rol";
-
-            $parametros['buscar_rol'] = $termino;
+            $condiciones[] = "`{$columnaRol}` LIKE :buscar_rol";
+            $parametros[':buscar_rol'] = $termino;
         }
 
-        $sql .= '
-            WHERE ' . implode(' OR ', $condiciones);
+        if ($columnaEstado !== null) {
+            $condiciones[] = "CAST(`{$columnaEstado}` AS CHAR) LIKE :buscar_estado";
+            $parametros[':buscar_estado'] = $termino;
+        }
+
+        $sql .= ' WHERE ' . implode(' OR ', $condiciones);
     }
 
     $sql .= " ORDER BY `{$columnaId}` DESC";
@@ -195,18 +199,36 @@ try {
     $consulta = $pdo->prepare($sql);
     $consulta->execute($parametros);
 
-    $usuarios = $consulta->fetchAll(
-        PDO::FETCH_ASSOC
-    );
+    $usuarios = $consulta->fetchAll(PDO::FETCH_ASSOC);
 } catch (Throwable $error) {
     error_log(
-        'Error al consultar usuarios: ' .
-        $error->getMessage()
+        'Error al consultar usuarios: ' . $error->getMessage()
     );
 
     $mensajeError =
         'No se pudieron cargar los usuarios. ' .
-        'Comprueba la tabla usuarios.';
+        'Comprueba la estructura de la tabla usuarios.';
+}
+
+/* =====================================================
+   MENSAJES DEL SISTEMA
+===================================================== */
+
+$mensajeExito = '';
+
+if (isset($_SESSION['flash']) && is_array($_SESSION['flash'])) {
+    $tipoFlash = (string) ($_SESSION['flash']['type'] ?? '');
+    $textoFlash = trim(
+        (string) ($_SESSION['flash']['message'] ?? '')
+    );
+
+    if ($tipoFlash === 'success') {
+        $mensajeExito = $textoFlash;
+    } elseif ($tipoFlash === 'error' && $mensajeError === '') {
+        $mensajeError = $textoFlash;
+    }
+
+    unset($_SESSION['flash']);
 }
 
 /* =====================================================
@@ -230,7 +252,7 @@ require_once $raiz . '/includes/header.php';
             type="search"
             name="buscar"
             value="<?= e($buscar) ?>"
-            placeholder="Buscar por nombre, correo o rol..."
+            placeholder="Buscar por nombre, correo, rol o estado..."
             autocomplete="off"
         >
 
@@ -262,6 +284,14 @@ require_once $raiz . '/includes/header.php';
 
 </div>
 
+<?php if ($mensajeExito !== ''): ?>
+
+    <div class="alert alert-success">
+        <?= e($mensajeExito) ?>
+    </div>
+
+<?php endif; ?>
+
 <?php if ($mensajeError !== ''): ?>
 
     <div class="alert alert-error">
@@ -273,7 +303,6 @@ require_once $raiz . '/includes/header.php';
 <div class="card">
 
     <div class="card-title">
-
         <div>
             <h2>Usuarios registrados</h2>
 
@@ -283,7 +312,6 @@ require_once $raiz . '/includes/header.php';
                 en el sistema
             </p>
         </div>
-
     </div>
 
     <div class="table-wrapper">
@@ -292,6 +320,7 @@ require_once $raiz . '/includes/header.php';
 
             <thead>
             <tr>
+                <th>ID</th>
                 <th>Usuario</th>
                 <th>Correo electrónico</th>
                 <th>Rol</th>
@@ -306,6 +335,8 @@ require_once $raiz . '/includes/header.php';
                 <?php foreach ($usuarios as $usuario): ?>
 
                     <?php
+                    $idUsuario = (int) ($usuario['id'] ?? 0);
+
                     $nombre = trim(
                         (string) ($usuario['nombre'] ?? '')
                     );
@@ -315,17 +346,27 @@ require_once $raiz . '/includes/header.php';
                     );
 
                     $rol = trim(
-                        (string) ($usuario['rol'] ?? 'Usuario')
+                        (string) ($usuario['rol'] ?? 'Sin rol')
                     );
 
-                    $estado = trim(
+                    $estadoOriginal = trim(
                         (string) ($usuario['estado'] ?? 'Activo')
                     );
 
-                    $estadoMinuscula = strtolower($estado);
+                    $estadoNormalizado = strtolower($estadoOriginal);
+
+                    $usuarioActivo = in_array(
+                        $estadoNormalizado,
+                        ['activo', '1', 'si', 'sí', 'true'],
+                        true
+                    );
                     ?>
 
                     <tr>
+
+                        <td>
+                            <?= $idUsuario ?>
+                        </td>
 
                         <td>
                             <strong>
@@ -347,19 +388,17 @@ require_once $raiz . '/includes/header.php';
 
                         <td>
                             <span class="badge badge-info">
-                                <?= e($rol) ?>
+                                <?= e(
+                                    $rol !== ''
+                                        ? $rol
+                                        : 'Sin rol'
+                                ) ?>
                             </span>
                         </td>
 
                         <td>
 
-                            <?php if (
-                                in_array(
-                                    $estadoMinuscula,
-                                    ['activo', '1'],
-                                    true
-                                )
-                            ): ?>
+                            <?php if ($usuarioActivo): ?>
 
                                 <span class="badge badge-success">
                                     Activo
@@ -382,7 +421,7 @@ require_once $raiz . '/includes/header.php';
             <?php elseif ($mensajeError === ''): ?>
 
                 <tr>
-                    <td colspan="4">
+                    <td colspan="5">
 
                         <div class="empty-state">
 

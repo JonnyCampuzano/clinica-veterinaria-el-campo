@@ -672,7 +672,7 @@ textarea:focus {
 ===================================================== */
 
 .sidebar {
-    background: linear-gradient(180deg, #2f5f93 0%, #3f7fbd 100%);
+    background: linear-gradient(180deg, #6ca3df 0%, #5179a1 100%);
 }
 
 .nav-menu a {
@@ -691,7 +691,7 @@ textarea:focus {
 }
 
 .brand-logo {
-    color: #1d4ed8;
+    color: #9cafe4;
     background: #dbeafe;
     box-shadow: 0 10px 24px rgba(30, 64, 175, 0.18);
 }
