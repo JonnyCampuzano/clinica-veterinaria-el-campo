@@ -1,65 +1,106 @@
 <?php
 declare(strict_types=1);
 
+/*
+|--------------------------------------------------------------------------
+| AUTENTICACIÓN, ROLES Y PERMISOS
+|--------------------------------------------------------------------------
+*/
+
 if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
 }
 
 /*
 |--------------------------------------------------------------------------
-| VERIFICAR SESIÓN
+| REDIRECCIÓN
 |--------------------------------------------------------------------------
 */
 
-function is_logged_in(): bool
-{
-    return !empty(
-        $_SESSION['usuario_id']
-        ?? $_SESSION['id_usuario']
-        ?? null
-    );
-}
+if (!function_exists('auth_redirect')) {
+    function auth_redirect(string $ruta): never
+    {
+        if (function_exists('url')) {
+            header('Location: ' . url($ruta));
+        } else {
+            header(
+                'Location: /clinica_veterinaria_el_campo/' .
+                ltrim($ruta, '/')
+            );
+        }
 
-function require_login(): void
-{
-    if (!is_logged_in()) {
-        header('Location: login.php?error=sesion_requerida');
         exit;
     }
 }
 
 /*
 |--------------------------------------------------------------------------
-| DATOS DEL USUARIO ACTUAL
+| USUARIO ACTUAL
 |--------------------------------------------------------------------------
 */
 
-function current_user(): array
-{
-    return [
-        'id' => (int) (
-            $_SESSION['usuario_id']
-            ?? $_SESSION['id_usuario']
-            ?? 0
-        ),
+if (!function_exists('current_user')) {
+    function current_user(): array
+    {
+        return [
+            'id' => (int) (
+                $_SESSION['usuario_id']
+                ?? $_SESSION['id_usuario']
+                ?? $_SESSION['user_id']
+                ?? $_SESSION['id']
+                ?? 0
+            ),
 
-        'nombre' => trim(
-            (string) (
-                $_SESSION['nombre']
-                ?? $_SESSION['usuario']
-                ?? 'Usuario'
-            )
-        ),
+            'nombre' => trim(
+                (string) (
+                    $_SESSION['nombre']
+                    ?? $_SESSION['usuario']
+                    ?? $_SESSION['nombre_usuario']
+                    ?? ''
+                )
+            ),
 
-        'correo' => trim(
-            (string) (
-                $_SESSION['correo']
-                ?? ''
-            )
-        ),
+            'correo' => trim(
+                (string) (
+                    $_SESSION['correo']
+                    ?? $_SESSION['email']
+                    ?? ''
+                )
+            ),
 
-        'rol' => current_role()
-    ];
+            'rol' => trim(
+                (string) (
+                    $_SESSION['rol']
+                    ?? $_SESSION['nombre_rol']
+                    ?? ''
+                )
+            ),
+        ];
+    }
+}
+
+/*
+|--------------------------------------------------------------------------
+| SESIÓN ACTIVA
+|--------------------------------------------------------------------------
+*/
+
+if (!function_exists('is_logged_in')) {
+    function is_logged_in(): bool
+    {
+        $usuario = current_user();
+
+        return (int) ($usuario['id'] ?? 0) > 0;
+    }
+}
+
+if (!function_exists('require_login')) {
+    function require_login(): void
+    {
+        if (!is_logged_in()) {
+            auth_redirect('login.php?error=sesion');
+        }
+    }
 }
 
 /*
@@ -68,280 +109,233 @@ function current_user(): array
 |--------------------------------------------------------------------------
 */
 
-function current_role(): string
-{
-    $rol = trim(
-        (string) (
-            $_SESSION['rol']
-            ?? ''
-        )
-    );
+if (!function_exists('normalize_role')) {
+    function normalize_role(string $rol): string
+    {
+        $rol = strtolower(trim($rol));
 
-    if (function_exists('mb_strtolower')) {
-        $rol = mb_strtolower($rol, 'UTF-8');
-    } else {
-        $rol = strtolower($rol);
+        $rol = strtr(
+            $rol,
+            [
+                'á' => 'a',
+                'é' => 'e',
+                'í' => 'i',
+                'ó' => 'o',
+                'ú' => 'u',
+                'ü' => 'u',
+                'ñ' => 'n',
+            ]
+        );
+
+        $rol = preg_replace('/\s+/', ' ', $rol) ?? $rol;
+
+        return match ($rol) {
+            'admin',
+            'administrador',
+            'administrator' => 'administrador',
+
+            'medico',
+            'medico veterinario',
+            'veterinario' => 'veterinario',
+
+            'recepcion',
+            'recepcionista' => 'recepcionista',
+
+            default => $rol,
+        };
     }
-
-    $rol = strtr($rol, [
-        'á' => 'a',
-        'é' => 'e',
-        'í' => 'i',
-        'ó' => 'o',
-        'ú' => 'u'
-    ]);
-
-    return match ($rol) {
-        'administrador',
-        'admin' => 'administrador',
-
-        'medico',
-        'veterinario' => 'medico',
-
-        'recepcionista',
-        'recepcion' => 'recepcionista',
-
-        default => 'sin_rol'
-    };
 }
 
-/*
-|--------------------------------------------------------------------------
-| NOMBRE VISIBLE DEL ROL
-|--------------------------------------------------------------------------
-*/
+if (!function_exists('current_role')) {
+    function current_role(): string
+    {
+        $usuario = current_user();
 
-function role_label(string $rol): string
-{
-    return match ($rol) {
-        'administrador' => 'Administrador',
-        'medico' => 'Médico',
-        'recepcionista' => 'Recepcionista',
-        default => 'Usuario'
-    };
-}
-
-/*
-|--------------------------------------------------------------------------
-| PERMISOS POR ROL
-|--------------------------------------------------------------------------
-*/
-
-function role_permissions(): array
-{
-    return [
-        'administrador' => [
-            'dashboard.ver',
-
-            'clientes.ver',
-            'clientes.crear',
-            'clientes.editar',
-            'clientes.eliminar',
-
-            'mascotas.ver',
-            'mascotas.crear',
-            'mascotas.editar',
-            'mascotas.eliminar',
-
-            'citas.ver',
-            'citas.crear',
-            'citas.editar',
-            'citas.eliminar',
-
-            'historias.ver',
-            'historias.crear',
-            'historias.editar',
-            'historias.eliminar',
-
-            'inventario.ver',
-            'inventario.crear',
-            'inventario.editar',
-            'inventario.eliminar',
-
-            'usuarios.ver',
-            'usuarios.crear',
-            'usuarios.editar',
-            'usuarios.eliminar'
-        ],
-
-        'medico' => [
-            'dashboard.ver',
-
-            'clientes.ver',
-
-            'mascotas.ver',
-
-            'citas.ver',
-            'citas.editar',
-
-            'historias.ver',
-            'historias.crear',
-            'historias.editar',
-
-            'inventario.ver'
-        ],
-
-        'recepcionista' => [
-            'dashboard.ver',
-
-            'clientes.ver',
-            'clientes.crear',
-            'clientes.editar',
-
-            'mascotas.ver',
-            'mascotas.crear',
-            'mascotas.editar',
-
-            'citas.ver',
-            'citas.crear',
-            'citas.editar'
-        ]
-    ];
-}
-
-/*
-|--------------------------------------------------------------------------
-| COMPROBAR PERMISO
-|--------------------------------------------------------------------------
-*/
-
-function can(string $permiso): bool
-{
-    if (!is_logged_in()) {
-        return false;
-    }
-
-    $rol = current_role();
-    $permisos = role_permissions();
-
-    if (!isset($permisos[$rol])) {
-        return false;
-    }
-
-    return in_array(
-        $permiso,
-        $permisos[$rol],
-        true
-    );
-}
-
-/*
-|--------------------------------------------------------------------------
-| EXIGIR PERMISO
-|--------------------------------------------------------------------------
-*/
-
-function require_permission(string $permiso): void
-{
-    require_login();
-
-    if (!can($permiso)) {
-        http_response_code(403);
-
-        $rol = role_label(current_role());
-
-        exit(
-            '<!DOCTYPE html>
-            <html lang="es">
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport"
-                      content="width=device-width, initial-scale=1.0">
-
-                <title>Acceso denegado</title>
-
-                <style>
-                    body {
-                        min-height: 100vh;
-                        margin: 0;
-                        display: grid;
-                        place-items: center;
-                        background: #f1f5f9;
-                        font-family: Arial, sans-serif;
-                    }
-
-                    .mensaje {
-                        width: min(420px, 90%);
-                        padding: 32px;
-                        text-align: center;
-                        background: #ffffff;
-                        border-radius: 18px;
-                        box-shadow: 0 15px 40px
-                            rgba(15, 23, 42, 0.10);
-                    }
-
-                    h1 {
-                        color: #dc2626;
-                    }
-
-                    p {
-                        color: #475569;
-                        line-height: 1.6;
-                    }
-
-                    a {
-                        display: inline-block;
-                        margin-top: 15px;
-                        padding: 12px 20px;
-                        color: #ffffff;
-                        background: #2563eb;
-                        border-radius: 10px;
-                        text-decoration: none;
-                        font-weight: bold;
-                    }
-                </style>
-            </head>
-
-            <body>
-                <div class="mensaje">
-                    <h1>Acceso denegado</h1>
-
-                    <p>
-                        El rol <strong>'
-                        . htmlspecialchars(
-                            $rol,
-                            ENT_QUOTES,
-                            'UTF-8'
-                        )
-                        . '</strong> no posee el permiso requerido.
-                    </p>
-
-                    <a href="panel.php">
-                        Regresar al panel
-                    </a>
-                </div>
-            </body>
-            </html>'
+        return normalize_role(
+            (string) ($usuario['rol'] ?? '')
         );
     }
 }
 
+if (!function_exists('role_label')) {
+    function role_label(?string $rol = null): string
+    {
+        $rolNormalizado = normalize_role(
+            $rol ?? current_role()
+        );
+
+        return match ($rolNormalizado) {
+            'administrador' => 'Administrador',
+            'veterinario' => 'Veterinario',
+            'recepcionista' => 'Recepcionista',
+            default => 'Usuario',
+        };
+    }
+}
 
 /*
 |--------------------------------------------------------------------------
-| REDIRECCIÓN DEL SISTEMA
+| MATRIZ DE PERMISOS
 |--------------------------------------------------------------------------
 */
 
-if (!function_exists('auth_redirect')) {
-    function auth_redirect(string $ruta): void
+if (!function_exists('role_permissions')) {
+    function role_permissions(): array
     {
-        $ruta = trim($ruta);
+        return [
+            'administrador' => [
+                'dashboard.ver',
 
-        if ($ruta === '') {
-            $ruta = 'login.php';
+                'clientes.ver',
+                'clientes.crear',
+                'clientes.editar',
+                'clientes.eliminar',
+
+                'mascotas.ver',
+                'mascotas.crear',
+                'mascotas.editar',
+                'mascotas.eliminar',
+
+                'citas.ver',
+                'citas.crear',
+                'citas.editar',
+                'citas.eliminar',
+
+                'historias.ver',
+                'historias.crear',
+                'historias.editar',
+                'historias.eliminar',
+
+                'inventario.ver',
+                'inventario.crear',
+                'inventario.editar',
+                'inventario.eliminar',
+
+                'usuarios.ver',
+                'usuarios.crear',
+                'usuarios.editar',
+                'usuarios.eliminar',
+
+                'reportes.ver',
+
+                'configuracion.ver',
+                'configuracion.editar',
+            ],
+
+            'veterinario' => [
+                'dashboard.ver',
+
+                'clientes.ver',
+
+                'mascotas.ver',
+                'mascotas.crear',
+                'mascotas.editar',
+
+                'citas.ver',
+                'citas.editar',
+
+                'historias.ver',
+                'historias.crear',
+                'historias.editar',
+
+                'inventario.ver',
+
+                'reportes.ver',
+            ],
+
+            'recepcionista' => [
+                'dashboard.ver',
+
+                'clientes.ver',
+                'clientes.crear',
+                'clientes.editar',
+
+                'mascotas.ver',
+                'mascotas.crear',
+                'mascotas.editar',
+
+                'citas.ver',
+                'citas.crear',
+                'citas.editar',
+                'citas.eliminar',
+
+                'historias.ver',
+
+                'inventario.ver',
+            ],
+        ];
+    }
+}
+
+if (!function_exists('current_permissions')) {
+    function current_permissions(): array
+    {
+        $matriz = role_permissions();
+        $rol = current_role();
+
+        return $matriz[$rol] ?? [];
+    }
+}
+
+if (!function_exists('can')) {
+    function can(string $permiso): bool
+    {
+        if (!is_logged_in()) {
+            return false;
         }
 
-        if (headers_sent($archivo, $linea)) {
-            exit(
-                'No se pudo redirigir porque ya se envió contenido desde '
-                . htmlspecialchars($archivo)
-                . ' en la línea '
-                . $linea
-            );
+        return in_array(
+            $permiso,
+            current_permissions(),
+            true
+        );
+    }
+}
+
+if (!function_exists('require_permission')) {
+    function require_permission(string $permiso): void
+    {
+        require_login();
+
+        if (!can($permiso)) {
+            auth_redirect('panel.php?error=sin_permiso');
+        }
+    }
+}
+
+/*
+|--------------------------------------------------------------------------
+| COMPATIBILIDAD CON ARCHIVOS ANTIGUOS: require_role()
+|--------------------------------------------------------------------------
+|
+| Esto evita el error:
+| Call to undefined function require_role()
+|
+*/
+
+if (!function_exists('has_role')) {
+    function has_role(string|array $roles): bool
+    {
+        $roles = is_array($roles) ? $roles : [$roles];
+        $rolActual = current_role();
+
+        foreach ($roles as $rol) {
+            if ($rolActual === normalize_role((string) $rol)) {
+                return true;
+            }
         }
 
-        header('Location: ' . $ruta);
-        exit;
+        return false;
+    }
+}
+
+if (!function_exists('require_role')) {
+    function require_role(string|array $roles): void
+    {
+        require_login();
+
+        if (!has_role($roles)) {
+            auth_redirect('panel.php?error=sin_permiso');
+        }
     }
 }

@@ -1,9 +1,6 @@
 <?php
 declare(strict_types=1);
 
-error_reporting(E_ALL);
-ini_set('display_errors', '1');
-
 require_once __DIR__ . '/config/app.php';
 require_once __DIR__ . '/includes/auth.php';
 
@@ -13,7 +10,7 @@ require_once __DIR__ . '/includes/auth.php';
 |--------------------------------------------------------------------------
 */
 
-require_login();
+require_permission('dashboard.ver');
 
 date_default_timezone_set('America/Guayaquil');
 
@@ -168,6 +165,15 @@ $modulos = [
             'usuarios/index.php',
             'usuarios/usuarios.php',
             'usuarios/listar_usuarios.php'
+        ]
+    ],
+    [
+        'titulo' => 'Reportes',
+        'icono' => '📊',
+        'descripcion' => 'Estadísticas e informes del sistema veterinario.',
+        'permiso' => 'reportes.ver',
+        'rutas' => [
+            'reportes/index.php'
         ]
     ]
 ];
@@ -1200,7 +1206,7 @@ $inicial = inicialUsuario($nombreUsuario);
 
                 <p>
                     Gestiona clientes, mascotas, citas, historias clínicas,
-                    inventario y usuarios desde una sola interfaz profesional,
+                    inventario, usuarios y reportes desde una sola interfaz profesional,
                     rápida y organizada.
                 </p>
 
@@ -1426,6 +1432,13 @@ $inicial = inicialUsuario($nombreUsuario);
                         <a href="<?= e($modulos[4]['ruta']) ?>" class="quick-link">
                             <span class="quick-number">4</span>
                             Ver inventario
+                        </a>
+                    <?php endif; ?>
+
+                    <?php if (isset($modulos[6]) && $modulos[6]['ruta'] !== null): ?>
+                        <a href="<?= e($modulos[6]['ruta']) ?>" class="quick-link">
+                            <span class="quick-number">5</span>
+                            Consultar reportes
                         </a>
                     <?php endif; ?>
 

@@ -34,7 +34,7 @@ function e(string $valor): string
 |--------------------------------------------------------------------------
 */
 $rolesPermitidos = [
-    'Usuario',
+    'Administrador',
     'Recepcionista',
     'Veterinario',
 ];
@@ -53,7 +53,7 @@ $tipoMensaje = '';
 
 $nombre = '';
 $correo = '';
-$rol = 'Usuario';
+$rol = 'Administrador';
 
 /*
 |--------------------------------------------------------------------------
@@ -132,12 +132,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $buscarUsuario = $pdo->prepare(
                 'SELECT id
                  FROM usuarios
-                 WHERE correo = :correo
+                 WHERE email = :email
                  LIMIT 1'
             );
 
             $buscarUsuario->execute([
-                ':correo' => $correo,
+                ':email' => $correo,
             ]);
 
             if ($buscarUsuario->fetch(PDO::FETCH_ASSOC)) {
@@ -167,15 +167,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 */
                 $registrar = $pdo->prepare(
                     'INSERT INTO usuarios
-                        (nombre, correo, contrasena, rol, estado)
+                        (nombre, email, password, rol, estado)
                      VALUES
-                        (:nombre, :correo, :contrasena, :rol, :estado)'
+                        (:nombre, :email, :password, :rol, :estado)'
                 );
 
                 $registrar->execute([
                     ':nombre' => $nombre,
-                    ':correo' => $correo,
-                    ':contrasena' => $contrasenaHash,
+                    ':email' => $correo,
+                    ':password' => $contrasenaHash,
                     ':rol' => $rol,
                     ':estado' => 'Activo',
                 ]);
@@ -187,7 +187,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 */
                 $nombre = '';
                 $correo = '';
-                $rol = 'Usuario';
+                $rol = 'Administrador';
 
                 $_SESSION['csrf_registro'] = bin2hex(
                     random_bytes(32)
@@ -197,7 +197,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $tipoMensaje = 'exito';
             }
         } catch (PDOException $e) {
-            $mensaje = 'No se pudo registrar el usuario. Verifica la conexión y la estructura de la tabla usuarios.';
+            $mensaje = 'No se pudo registrar el usuario. Detalle: ' . $e->getMessage();
             $tipoMensaje = 'error';
         } catch (Throwable $e) {
             $mensaje = 'Ocurrió un error inesperado al registrar el usuario.';

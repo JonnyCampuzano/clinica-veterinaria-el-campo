@@ -58,7 +58,8 @@ $datos = [
     'apellidos' => '',
     'cedula' => '',
     'telefono' => '',
-    'email' => ''
+    'email' => '',
+    'direccion' => ''
 ];
 
 $mensajeError = '';
@@ -72,21 +73,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'nombres' => trim(
             (string) ($_POST['nombres'] ?? '')
         ),
-
         'apellidos' => trim(
             (string) ($_POST['apellidos'] ?? '')
         ),
-
         'cedula' => trim(
             (string) ($_POST['cedula'] ?? '')
         ),
-
         'telefono' => trim(
             (string) ($_POST['telefono'] ?? '')
         ),
-
-        'email' => trim(
-            (string) ($_POST['email'] ?? '')
+        'email' => strtolower(
+            trim((string) ($_POST['email'] ?? ''))
+        ),
+        'direccion' => trim(
+            (string) ($_POST['direccion'] ?? '')
         )
     ];
 
@@ -105,47 +105,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (
         $tokenSesion === '' ||
         $tokenFormulario === '' ||
-        !hash_equals(
-            $tokenSesion,
-            $tokenFormulario
-        )
+        !hash_equals($tokenSesion, $tokenFormulario)
     ) {
         $mensajeError =
-            'La sesión del formulario expiró. ' .
-            'Recarga la página.';
+            'La sesión del formulario expiró. Recarga la página.';
     } elseif (
         $datos['nombres'] === '' ||
         $datos['apellidos'] === '' ||
         $datos['cedula'] === '' ||
         $datos['telefono'] === '' ||
-        $datos['email'] === ''
+        $datos['email'] === '' ||
+        $datos['direccion'] === ''
     ) {
-        $mensajeError =
-            'Todos los campos son obligatorios.';
-    } elseif (
-        !preg_match(
-            '/^[0-9]{10}$/',
-            $datos['cedula']
-        )
-    ) {
+        $mensajeError = 'Todos los campos son obligatorios.';
+    } elseif (strlen($datos['nombres']) > 100) {
+        $mensajeError = 'Los nombres no pueden superar 100 caracteres.';
+    } elseif (strlen($datos['apellidos']) > 100) {
+        $mensajeError = 'Los apellidos no pueden superar 100 caracteres.';
+    } elseif (!preg_match('/^[0-9]{10}$/', $datos['cedula'])) {
         $mensajeError =
             'La cédula debe contener exactamente 10 números.';
-    } elseif (
-        !preg_match(
-            '/^[0-9]{10}$/',
-            $datos['telefono']
-        )
-    ) {
+    } elseif (!preg_match('/^[0-9]{10}$/', $datos['telefono'])) {
         $mensajeError =
             'El teléfono debe contener exactamente 10 números.';
-    } elseif (
-        !filter_var(
-            $datos['email'],
-            FILTER_VALIDATE_EMAIL
-        )
-    ) {
-        $mensajeError =
-            'El correo electrónico no es válido.';
+    } elseif (!filter_var($datos['email'], FILTER_VALIDATE_EMAIL)) {
+        $mensajeError = 'El correo electrónico no es válido.';
+    } elseif (strlen($datos['email']) > 150) {
+        $mensajeError = 'El correo no puede superar 150 caracteres.';
+    } elseif (strlen($datos['direccion']) > 255) {
+        $mensajeError = 'La dirección no puede superar 255 caracteres.';
     } else {
         try {
             /* =========================================
@@ -161,13 +149,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             );
 
             $verificar->execute([
-                'cedula' => $datos['cedula'],
-                'email' => $datos['email']
+                ':cedula' => $datos['cedula'],
+                ':email' => $datos['email']
             ]);
 
-            $clienteExistente = $verificar->fetch();
-
-            if ($clienteExistente) {
+            if ($verificar->fetch(PDO::FETCH_ASSOC)) {
                 $mensajeError =
                     'Ya existe un cliente con esa cédula o correo.';
             } else {
@@ -176,58 +162,66 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ===================================== */
 
                 $registrar = $pdo->prepare(
-                    'INSERT INTO clientes
-                        (
-                            nombres,
-                            apellidos,
-                            cedula,
-                            telefono,
-                            email
-                        )
-                     VALUES
-                        (
-                            :nombres,
-                            :apellidos,
-                            :cedula,
-                            :telefono,
-                            :email
-                        )'
+                    'INSERT INTO clientes (
+                        nombres,
+                        apellidos,
+                        cedula,
+                        telefono,
+                        email,
+                        direccion
+                    ) VALUES (
+                        :nombres,
+                        :apellidos,
+                        :cedula,
+                        :telefono,
+                        :email,
+                        :direccion
+                    )'
                 );
 
                 $registrar->execute([
-                    'nombres' => $datos['nombres'],
-                    'apellidos' => $datos['apellidos'],
-                    'cedula' => $datos['cedula'],
-                    'telefono' => $datos['telefono'],
-                    'email' => $datos['email']
+                    ':nombres' => $datos['nombres'],
+                    ':apellidos' => $datos['apellidos'],
+                    ':cedula' => $datos['cedula'],
+                    ':telefono' => $datos['telefono'],
+                    ':email' => $datos['email'],
+                    ':direccion' => $datos['direccion']
                 ]);
 
-                /* Crear un nuevo token después del registro */
                 $_SESSION['csrf_crear_cliente'] =
                     bin2hex(random_bytes(32));
 
                 $_SESSION['flash'] = [
                     'type' => 'success',
-                    'message' =>
-                        'Cliente registrado correctamente.'
+                    'message' => 'Cliente registrado correctamente.'
                 ];
 
                 header(
-                    'Location: ' .
-                    url('clientes/index.php')
+                    'Location: ' . url('clientes/index.php')
                 );
-
                 exit;
+            }
+        } catch (PDOException $error) {
+            error_log(
+                'Error PDO al registrar cliente: ' .
+                $error->getMessage()
+            );
+
+            if ($error->getCode() === '23000') {
+                $mensajeError =
+                    'La cédula o el correo ya están registrados.';
+            } else {
+                $mensajeError =
+                    'No se pudo registrar el cliente. Revisa la conexión y la tabla clientes.';
             }
         } catch (Throwable $error) {
             error_log(
-                'Error al registrar cliente: ' .
+                'Error inesperado al registrar cliente: ' .
                 $error->getMessage()
             );
 
             $mensajeError =
-                'No se pudo registrar el cliente. ' .
-                'Comprueba las columnas de la tabla clientes.';
+                'Ocurrió un error inesperado al registrar el cliente.';
         }
     }
 }
@@ -564,6 +558,29 @@ require_once $raiz . '/includes/header.php';
                         maxlength="150"
                         placeholder="cliente@correo.com"
                         value="<?= e($datos['email']) ?>"
+                        required
+                    >
+
+                </div>
+
+                <div
+                    class="
+                        registro-grupo
+                        registro-grupo-completo
+                    "
+                >
+
+                    <label for="direccion">
+                        Dirección
+                    </label>
+
+                    <input
+                        type="text"
+                        id="direccion"
+                        name="direccion"
+                        maxlength="255"
+                        placeholder="Ejemplo: Av. Principal y calle 10"
+                        value="<?= e($datos['direccion']) ?>"
                         required
                     >
 

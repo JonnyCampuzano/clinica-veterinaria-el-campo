@@ -3,24 +3,21 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/_bootstrap.php';
 
-$csrfClave = 'csrf_crear_historia';
+$id = $_SERVER['REQUEST_METHOD'] === 'POST'
+    ? ((int) ($_POST['id'] ?? 0))
+    : (filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT) ?: 0);
+
+if ($id <= 0) {
+    hc_flash('error', 'El identificador no es válido.');
+    hc_redirigir('consultas/index.php');
+}
+
+$csrfClave = 'csrf_editar_historia';
 $csrfToken = hc_csrf_token($csrfClave);
-
-$usuarioId = hc_usuario_id_actual();
-
-$datos = [
-    'mascota_id' => 0,
-    'fecha' => date('Y-m-d'),
-    'motivo' => '',
-    'diagnostico' => '',
-    'tratamiento' => '',
-    'peso' => '',
-    'temperatura' => '',
-    'proxima_cita' => '',
-];
 
 $errores = [];
 $mascotas = [];
+$historia = null;
 
 try {
     $consultaMascotas = $pdo->query(
@@ -44,13 +41,65 @@ try {
     $mascotas = $consultaMascotas->fetchAll(PDO::FETCH_ASSOC);
 } catch (Throwable $error) {
     error_log(
-        'Error cargando mascotas para historia clínica: ' .
+        'Error cargando mascotas para editar historia: ' .
         $error->getMessage()
     );
 
     $errores[] =
-        'No se pudieron cargar las mascotas registradas.';
+        'No se pudieron cargar las mascotas.';
 }
+
+try {
+    $consultaHistoria = $pdo->prepare(
+        'SELECT
+            id,
+            mascota_id,
+            usuario_id,
+            fecha,
+            motivo,
+            diagnostico,
+            tratamiento,
+            peso,
+            temperatura,
+            proxima_cita
+         FROM historias_clinicas
+         WHERE id = :id
+         LIMIT 1'
+    );
+
+    $consultaHistoria->execute([':id' => $id]);
+
+    $historia = $consultaHistoria->fetch(PDO::FETCH_ASSOC);
+} catch (Throwable $error) {
+    error_log(
+        'Error cargando historia clínica para editar: ' .
+        $error->getMessage()
+    );
+}
+
+if (!is_array($historia)) {
+    hc_flash(
+        'error',
+        'La historia clínica solicitada no existe.'
+    );
+
+    hc_redirigir('consultas/index.php');
+}
+
+$datos = [
+    'mascota_id' => (int) ($historia['mascota_id'] ?? 0),
+    'fecha' => (string) ($historia['fecha'] ?? ''),
+    'motivo' => (string) ($historia['motivo'] ?? ''),
+    'diagnostico' =>
+        (string) ($historia['diagnostico'] ?? ''),
+    'tratamiento' =>
+        (string) ($historia['tratamiento'] ?? ''),
+    'peso' => (string) ($historia['peso'] ?? ''),
+    'temperatura' =>
+        (string) ($historia['temperatura'] ?? ''),
+    'proxima_cita' =>
+        (string) ($historia['proxima_cita'] ?? ''),
+];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $datos = [
@@ -82,47 +131,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'Actualiza la página.';
     }
 
-    if ($usuarioId <= 0) {
-        $errores[] =
-            'No fue posible identificar al usuario conectado. ' .
-            'Cierra sesión e ingresa nuevamente.';
-    }
-
     if ($datos['mascota_id'] <= 0) {
         $errores[] = 'Selecciona una mascota.';
     }
 
     if ($datos['fecha'] === '') {
         $errores[] = 'Selecciona la fecha de atención.';
-    } else {
-        $fechaObjeto = DateTime::createFromFormat(
-            'Y-m-d',
-            $datos['fecha']
-        );
-
-        $fechaValida =
-            $fechaObjeto instanceof DateTime &&
-            $fechaObjeto->format('Y-m-d') === $datos['fecha'];
-
-        if (!$fechaValida) {
-            $errores[] = 'La fecha de atención no es válida.';
-        } elseif ($datos['fecha'] > date('Y-m-d')) {
-            $errores[] =
-                'La fecha de atención no puede ser futura.';
-        }
+    } elseif ($datos['fecha'] > date('Y-m-d')) {
+        $errores[] =
+            'La fecha de atención no puede ser futura.';
     }
 
-    foreach (
-        [
-            'motivo' => 'Escribe el motivo de la consulta.',
-            'diagnostico' => 'Escribe el diagnóstico.',
-            'tratamiento' => 'Escribe el tratamiento.',
-        ]
-        as $campo => $mensaje
-    ) {
-        if ($datos[$campo] === '') {
-            $errores[] = $mensaje;
-        }
+    if ($datos['motivo'] === '') {
+        $errores[] = 'Escribe el motivo de consulta.';
+    }
+
+    if ($datos['diagnostico'] === '') {
+        $errores[] = 'Escribe el diagnóstico.';
+    }
+
+    if ($datos['tratamiento'] === '') {
+        $errores[] = 'Escribe el tratamiento.';
     }
 
     if (
@@ -159,66 +188,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'La temperatura debe estar entre 25 y 50 °C.';
     }
 
-    if ($datos['mascota_id'] > 0) {
+    if ($errores === []) {
         try {
-            $verificarMascota = $pdo->prepare(
-                'SELECT id
-                 FROM mascotas
+            $actualizar = $pdo->prepare(
+                'UPDATE historias_clinicas
+                 SET
+                    mascota_id = :mascota_id,
+                    fecha = :fecha,
+                    motivo = :motivo,
+                    diagnostico = :diagnostico,
+                    tratamiento = :tratamiento,
+                    peso = :peso,
+                    temperatura = :temperatura,
+                    proxima_cita = :proxima_cita
                  WHERE id = :id
                  LIMIT 1'
             );
 
-            $verificarMascota->execute([
-                ':id' => $datos['mascota_id']
-            ]);
-
-            if (!$verificarMascota->fetchColumn()) {
-                $errores[] =
-                    'La mascota seleccionada no existe.';
-            }
-        } catch (Throwable $error) {
-            error_log(
-                'Error verificando mascota: ' .
-                $error->getMessage()
-            );
-
-            $errores[] =
-                'No se pudo validar la mascota seleccionada.';
-        }
-    }
-
-    if ($errores === []) {
-        try {
-            $insertar = $pdo->prepare(
-                'INSERT INTO historias_clinicas
-                    (
-                        mascota_id,
-                        usuario_id,
-                        fecha,
-                        motivo,
-                        diagnostico,
-                        tratamiento,
-                        peso,
-                        temperatura,
-                        proxima_cita
-                    )
-                 VALUES
-                    (
-                        :mascota_id,
-                        :usuario_id,
-                        :fecha,
-                        :motivo,
-                        :diagnostico,
-                        :tratamiento,
-                        :peso,
-                        :temperatura,
-                        :proxima_cita
-                    )'
-            );
-
-            $insertar->execute([
+            $actualizar->execute([
                 ':mascota_id' => $datos['mascota_id'],
-                ':usuario_id' => $usuarioId,
                 ':fecha' => $datos['fecha'],
                 ':motivo' => $datos['motivo'],
                 ':diagnostico' => $datos['diagnostico'],
@@ -229,30 +217,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $datos['proxima_cita'] !== ''
                         ? $datos['proxima_cita']
                         : null,
+                ':id' => $id,
             ]);
 
             hc_regenerar_csrf($csrfClave);
 
             hc_flash(
                 'success',
-                'Historia clínica registrada correctamente.'
+                'Historia clínica actualizada correctamente.'
             );
 
             hc_redirigir('consultas/index.php');
         } catch (Throwable $error) {
             error_log(
-                'Error registrando historia clínica: ' .
+                'Error actualizando historia clínica: ' .
                 $error->getMessage()
             );
 
             $errores[] =
-                'No se pudo registrar la historia clínica. ' .
-                'Revisa la estructura de la tabla consultas.';
+                'No se pudo actualizar la historia clínica.';
         }
     }
 }
 
-$pageTitle = 'Nueva historia clínica';
+$pageTitle = 'Editar historia clínica';
 $activePage = 'consultas';
 
 require_once $raiz . '/includes/header.php';
@@ -261,13 +249,29 @@ require_once __DIR__ . '/_styles.php';
 
 <div class="hc-page">
     <section class="hc-panel">
-        <header class="hc-header">
-            <div>
-                <h1>🩺 Nueva historia clínica</h1>
+        <header class="hc-header hc-edit-header">
+            <div class="hc-header-copy">
+                <h1>✏️ Editar historia clínica</h1>
+
                 <p>
-                    Registra el motivo, diagnóstico, tratamiento
-                    y datos clínicos de la mascota.
+                    Actualiza los datos médicos del registro
+                    #<?= $id ?>.
                 </p>
+            </div>
+
+            <div class="hc-header-controls">
+                <span class="hc-record-badge">
+                    Registro #<?= $id ?>
+                </span>
+
+                <a
+                    class="hc-btn hc-btn-secondary"
+                    href="<?= hc_e(
+                        hc_url('consultas/index.php')
+                    ) ?>"
+                >
+                    ← Volver
+                </a>
             </div>
         </header>
 
@@ -282,14 +286,16 @@ require_once __DIR__ . '/_styles.php';
             </div>
         <?php endif; ?>
 
-        <form method="POST" class="hc-form" autocomplete="off">
+        <form method="POST" class="hc-form hc-edit-form" autocomplete="off">
+            <input type="hidden" name="id" value="<?= $id ?>">
+
             <input
                 type="hidden"
                 name="csrf_token"
                 value="<?= hc_e($csrfToken) ?>"
             >
 
-            <div class="hc-form-grid">
+            <div class="hc-form-grid hc-edit-grid">
                 <div class="hc-field hc-field-full">
                     <label for="mascota_id">
                         Mascota y propietario
@@ -300,8 +306,6 @@ require_once __DIR__ . '/_styles.php';
                         name="mascota_id"
                         required
                     >
-                        <option value="">Seleccione una mascota</option>
-
                         <?php foreach ($mascotas as $mascota): ?>
                             <?php
                             $propietario = trim(
@@ -330,17 +334,6 @@ require_once __DIR__ . '/_styles.php';
                             }
 
                             $descripcion .= ')';
-
-                            $cedula = trim(
-                                (string) (
-                                    $mascota['cliente_cedula'] ?? ''
-                                )
-                            );
-
-                            if ($cedula !== '') {
-                                $descripcion .=
-                                    ' · Cédula: ' . $cedula;
-                            }
                             ?>
 
                             <option
@@ -393,7 +386,6 @@ require_once __DIR__ . '/_styles.php';
                         max="9999.99"
                         step="0.01"
                         value="<?= hc_e($datos['peso']) ?>"
-                        placeholder="Ejemplo: 12.50"
                     >
                 </div>
 
@@ -410,17 +402,15 @@ require_once __DIR__ . '/_styles.php';
                         max="50"
                         step="0.1"
                         value="<?= hc_e($datos['temperatura']) ?>"
-                        placeholder="Ejemplo: 38.5"
                     >
                 </div>
 
                 <div class="hc-field hc-field-full">
-                    <label for="motivo">Motivo de consulta</label>
+                    <label for="motivo">Motivo</label>
 
                     <textarea
                         id="motivo"
                         name="motivo"
-                        maxlength="2000"
                         required
                     ><?= hc_e($datos['motivo']) ?></textarea>
                 </div>
@@ -431,7 +421,6 @@ require_once __DIR__ . '/_styles.php';
                     <textarea
                         id="diagnostico"
                         name="diagnostico"
-                        maxlength="5000"
                         required
                     ><?= hc_e($datos['diagnostico']) ?></textarea>
                 </div>
@@ -442,7 +431,6 @@ require_once __DIR__ . '/_styles.php';
                     <textarea
                         id="tratamiento"
                         name="tratamiento"
-                        maxlength="5000"
                         required
                     ><?= hc_e($datos['tratamiento']) ?></textarea>
                 </div>
@@ -458,10 +446,9 @@ require_once __DIR__ . '/_styles.php';
 
                 <button
                     type="submit"
-                    class="hc-btn hc-btn-primary"
-                    <?= $mascotas === [] ? 'disabled' : '' ?>
+                    class="hc-btn hc-btn-warning"
                 >
-                    💾 Registrar historia clínica
+                    💾 Guardar cambios
                 </button>
             </div>
         </form>
