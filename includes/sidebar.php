@@ -136,6 +136,15 @@ $claseActiva = static function (
             </a>
         <?php endif; ?>
 
+        <!-- reporte -->
+         <?php if (can('reportes.ver')): ?>
+            <a 
+                 href="<?= url('modulos/reportes/index.php') ?>" class="menu-item">
+                <span>📊</span>
+                <span>Reportes</span>
+            </a>
+        <?php endif; ?>
+
         <!-- USUARIOS -->
         <?php if (can('usuarios.ver')): ?>
             <a

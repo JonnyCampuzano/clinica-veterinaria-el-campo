@@ -4,26 +4,19 @@ declare(strict_types=1);
 require_once __DIR__ . '/config/app.php';
 require_once __DIR__ . '/includes/auth.php';
 
-/*
-|--------------------------------------------------------------------------
-| PROTEGER EL DASHBOARD MEDIANTE PERMISOS
-|--------------------------------------------------------------------------
-*/
+require_login();
 
-require_permission('dashboard.ver');
-
-date_default_timezone_set('America/Guayaquil');
-
-/*
-|--------------------------------------------------------------------------
-| DATOS DEL USUARIO AUTENTICADO
-|--------------------------------------------------------------------------
-*/
+date_default_timezone_set(
+    'America/Guayaquil'
+);
 
 $usuarioActual = current_user();
 
 $nombreUsuario = trim(
-    (string) ($usuarioActual['nombre'] ?? '')
+    (string) (
+        $usuarioActual['nombre']
+        ?? 'Usuario'
+    )
 );
 
 if ($nombreUsuario === '') {
@@ -31,11 +24,10 @@ if ($nombreUsuario === '') {
 }
 
 $rolActual = current_role();
-$nombreRol = role_label($rolActual);
 
-if (trim($nombreRol) === '') {
-    $nombreRol = 'Usuario';
-}
+$nombreRol = role_label(
+    $rolActual
+);
 
 /*
 |--------------------------------------------------------------------------

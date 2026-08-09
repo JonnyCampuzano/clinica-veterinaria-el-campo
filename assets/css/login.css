@@ -1,367 +1,667 @@
+/* ================================================================
+   RESET
+================================================================ */
+
 * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
-    font-family: 'Segoe UI', Arial, sans-serif;
 }
+
+
+html,
+body {
+    width: 100%;
+    min-height: 100%;
+}
+
 
 body {
+
     min-height: 100vh;
-    background: #f4f8ff;
-}
 
-.login-wrapper {
-    min-height: 100vh;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-}
+    font-family:
+        "Segoe UI",
+        Arial,
+        Helvetica,
+        sans-serif;
 
-.login-hero {
-    background: linear-gradient(180deg, #eef6ff 0%, #ffffff 100%);
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    padding: 45px;
-    border-right: 1px solid #dbeafe;
-}
-
-.brand {
-    text-align: center;
-    margin-bottom: 25px;
-}
-
-.brand-icon {
-    width: 72px;
-    height: 72px;
-    margin: 0 auto 10px;
-    border: 2px solid #2563eb;
-    border-radius: 50%;
-    display: grid;
-    place-items: center;
-    font-size: 34px;
-    background: white;
-}
-
-.brand h1 {
-    color: #174ea6;
-    font-size: 30px;
-    font-weight: 800;
-}
-
-.welcome {
-    text-align: center;
-    color: #475569;
-    margin-bottom: 24px;
-}
-
-.welcome h2 {
-    color: #1e3a8a;
-    font-size: 22px;
-    margin-bottom: 8px;
-}
-
-.pets-img {
-    width: 520px;
-    max-width: 100%;
-    display: block;
-    margin: 20px auto 0;
-}
-
-.login-panel {
     background: #f8fbff;
+
+    color: #172033;
+}
+
+
+/* ================================================================
+   CONTENEDOR PRINCIPAL
+================================================================ */
+
+.pagina-login {
+
+    width: 100%;
+
+    min-height: 100vh;
+
+    display: grid;
+
+    grid-template-columns:
+        1fr 1fr;
+}
+
+
+/* ================================================================
+   LADO IZQUIERDO
+================================================================ */
+
+.lado-izquierdo {
+
+    min-height: 100vh;
+
+    background: #f2f8ff;
+
+    border-right:
+        1px solid #dbe7f5;
+
     display: flex;
-    align-items: center;
+
     justify-content: center;
+
+    align-items: center;
+
+    padding: 40px;
+
+    overflow: hidden;
+}
+
+
+.bienvenida {
+
+    width: 100%;
+
+    max-width: 620px;
+
+    text-align: center;
+}
+
+
+/* ================================================================
+   LOGO
+================================================================ */
+
+.logo-circulo {
+
+    width: 82px;
+
+    height: 82px;
+
+    margin:
+        0 auto 18px;
+
+    border:
+        2px solid #2563eb;
+
+    border-radius: 50%;
+
+    background: #ffffff;
+
+    display: flex;
+
+    justify-content: center;
+
+    align-items: center;
+
+    font-size: 33px;
+
+    box-shadow:
+        0 4px 15px
+        rgba(37, 99, 235, 0.08);
+}
+
+
+/* ================================================================
+   NOMBRE SISTEMA
+================================================================ */
+
+.nombre-sistema {
+
+    color: #1954a6;
+
+    font-size: 35px;
+
+    font-weight: 800;
+
+    margin-bottom: 30px;
+}
+
+
+/* ================================================================
+   BIENVENIDA
+================================================================ */
+
+.bienvenida h2 {
+
+    color: #173f88;
+
+    font-size: 26px;
+
+    font-weight: 750;
+
+    margin-bottom: 10px;
+}
+
+
+.bienvenida p {
+
+    color: #44546d;
+
+    font-size: 17px;
+
+    margin-bottom: 45px;
+}
+
+
+/* ================================================================
+   IMAGEN
+================================================================ */
+
+.imagen-mascotas {
+
+    display: block;
+
+    width: 100%;
+
+    max-width: 550px;
+
+    height: auto;
+
+    margin:
+        0 auto;
+
+    object-fit: contain;
+}
+
+
+/* ================================================================
+   LADO DERECHO
+================================================================ */
+
+.lado-derecho {
+
+    min-height: 100vh;
+
+    background: #f9fbff;
+
+    display: flex;
+
+    justify-content: center;
+
+    align-items: center;
+
     padding: 35px;
 }
 
-.login-card {
-    width: 390px;
-    background: white;
-    padding: 34px;
-    border-radius: 16px;
-    box-shadow: 0 20px 45px rgba(30, 64, 175, .12);
-    border: 1px solid #e5eefb;
-}
 
-.lock-icon {
-    width: 46px;
-    height: 46px;
-    background: #eff6ff;
-    color: #1d4ed8;
-    display: grid;
-    place-items: center;
-    margin: 0 auto 10px;
-    border-radius: 12px;
-}
+/* ================================================================
+   TARJETA LOGIN
+================================================================ */
 
-.login-card h2 {
-    text-align: center;
-    color: #1e293b;
-    font-size: 22px;
-    margin-bottom: 24px;
-}
+.tarjeta-login {
 
-.login-card label {
-    display: block;
-    font-size: 14px;
-    color: #334155;
-    font-weight: 700;
-    margin-bottom: 7px;
-}
-
-.login-card input[type="email"],
-.login-card input[type="password"] {
     width: 100%;
-    height: 46px;
-    border: 1px solid #cbd5e1;
-    border-radius: 10px;
-    padding: 0 13px;
-    margin-bottom: 17px;
-    outline: none;
+
+    max-width: 440px;
+
     background: #ffffff;
+
+    border:
+        1px solid #dce7f5;
+
+    border-radius: 18px;
+
+    padding:
+        38px 38px 34px;
+
+    box-shadow:
+        0 20px 55px
+        rgba(40, 78, 130, 0.12);
 }
 
-.login-card input:focus {
-    border-color: #2563eb;
-    box-shadow: 0 0 0 4px rgba(37, 99, 235, .10);
-}
 
-.options {
+/* ================================================================
+   CANDADO
+================================================================ */
+
+.icono-candado {
+
+    width: 54px;
+
+    height: 54px;
+
+    margin:
+        0 auto 14px;
+
+    border-radius: 15px;
+
+    background: #eff6ff;
+
     display: flex;
-    justify-content: space-between;
+
+    justify-content: center;
+
     align-items: center;
-    margin-bottom: 22px;
+
+    font-size: 22px;
+}
+
+
+/* ================================================================
+   TITULO
+================================================================ */
+
+.titulo-login {
+
+    text-align: center;
+
+    color: #111111;
+
+    font-size: 26px;
+
+    font-weight: 800;
+
+    margin-bottom: 30px;
+}
+
+
+/* ================================================================
+   MENSAJE ERROR
+================================================================ */
+
+.mensaje-error {
+
+    width: 100%;
+
+    margin-bottom: 20px;
+
+    padding:
+        12px 14px;
+
+    background: #fff1f1;
+
+    border:
+        1px solid #ffc5c5;
+
+    border-radius: 9px;
+
+    color: #b42318;
+
+    font-size: 14px;
+
+    text-align: center;
+}
+
+
+/* ================================================================
+   FORMULARIO
+================================================================ */
+
+.grupo-formulario {
+
+    margin-bottom: 21px;
+}
+
+
+.grupo-formulario label {
+
+    display: block;
+
+    margin-bottom: 8px;
+
+    color: #17213b;
+
+    font-size: 14px;
+
+    font-weight: 700;
+}
+
+
+/* ================================================================
+   CAMPOS
+================================================================ */
+
+.campo {
+
+    width: 100%;
+
+    height: 57px;
+
+    padding:
+        0 17px;
+
+    background: #ffffff;
+
+    border:
+        1px solid #bfd0e8;
+
+    border-radius: 10px;
+
+    outline: none;
+
+    color: #182033;
+
+    font-size: 16px;
+
+    transition:
+        border-color 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+
+.campo::placeholder {
+
+    color: #777d87;
+}
+
+
+.campo:hover {
+
+    border-color: #8da9cf;
+}
+
+
+.campo:focus {
+
+    border-color: #2f7d4a;
+
+    box-shadow:
+        0 0 0 3px
+        rgba(47, 125, 74, 0.12);
+}
+
+
+/* ================================================================
+   BOTÓN INICIAR SESIÓN
+================================================================ */
+
+.btn-iniciar {
+
+    width: 100%;
+
+    min-height: 55px;
+
+    margin-top: 4px;
+
+    padding:
+        12px 18px;
+
+    border: none;
+
+    border-radius: 10px;
+
+    background: #507de4;
+
+    color: #ffffff;
+
+    font-family: inherit;
+
+    font-size: 17px;
+
+    font-weight: 700;
+
+    cursor: pointer;
+
+    transition:
+        background 0.2s ease,
+        transform 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+
+.btn-iniciar:hover {
+
+    background: #286c40;
+
+    transform:
+        translateY(-1px);
+
+    box-shadow:
+        0 7px 18px
+        rgba(47, 125, 74, 0.20);
+}
+
+
+.btn-iniciar:active {
+
+    transform:
+        translateY(0);
+}
+
+
+/* ================================================================
+   OLVIDASTE CONTRASEÑA / CREAR USUARIO
+================================================================ */
+
+.links-login {
+
+    width: 100%;
+
+    margin-top: 24px;
+
+    display: flex;
+
+    justify-content: center;
+
+    align-items: center;
+
+    flex-wrap: wrap;
+
+    gap: 11px;
+
+    text-align: center;
+}
+
+
+.links-login a {
+
+    color: #18763c;
+
+    font-size: 15px;
+
+    font-weight: 700;
+
+    text-decoration: none;
+
+    transition:
+        color 0.2s ease;
+}
+
+
+.links-login a:hover {
+
+    color: #125d2f;
+
+    text-decoration: underline;
+}
+
+
+.separador {
+
+    color: #a0a0a0;
+
+    font-size: 17px;
+}
+
+
+/* ================================================================
+   VOLVER
+================================================================ */
+
+.volver-login {
+
+    margin-top: 27px;
+
+    text-align: center;
+}
+
+
+.volver-login a {
+
+    color: #454545;
+
+    font-size: 15px;
+
+    text-decoration: none;
+
+    transition:
+        color 0.2s ease;
+}
+
+
+.volver-login a:hover {
+
+    color: #2f7d4a;
+}
+
+
+/* ================================================================
+   PIE
+================================================================ */
+
+.pie-login {
+
+    margin-top: 28px;
+
+    text-align: center;
+
+    color: #97a3b5;
+
     font-size: 13px;
 }
 
-.remember {
-    display: flex !important;
-    gap: 7px;
-    align-items: center;
-    margin: 0 !important;
-    font-weight: 500 !important;
+
+/* ================================================================
+   TABLET
+================================================================ */
+
+@media (max-width: 1050px) {
+
+    .nombre-sistema {
+
+        font-size: 30px;
+    }
+
+
+    .bienvenida h2 {
+
+        font-size: 24px;
+    }
+
+
+    .imagen-mascotas {
+
+        max-width: 350px;
+    }
+
+
+    .tarjeta-login {
+
+        max-width: 410px;
+
+        padding:
+            34px 30px;
+    }
 }
 
-.options a {
-    color: #2563eb;
-    text-decoration: none;
-    font-weight: 600;
-}
 
-button {
-    width: 100%;
-    height: 46px;
-    border: none;
-    border-radius: 10px;
-    background: #2563eb;
-    color: white;
-    font-weight: 800;
-    font-size: 15px;
-    cursor: pointer;
-}
-
-button:hover {
-    background: #1d4ed8;
-}
-
-.alert {
-    padding: 11px;
-    border-radius: 9px;
-    background: #fee2e2;
-    color: #991b1b;
-    font-size: 14px;
-    margin-bottom: 15px;
-    text-align: center;
-}
-
-.footer {
-    text-align: center;
-    color: #94a3b8;
-    font-size: 12px;
-    margin-top: 18px;
-}
+/* ================================================================
+   CELULAR
+================================================================ */
 
 @media (max-width: 850px) {
-    .login-wrapper {
-        grid-template-columns: 1fr;
+
+    .pagina-login {
+
+        display: block;
     }
 
-    .login-hero {
-        padding: 25px;
+
+    .lado-izquierdo {
+
+        display: none;
     }
 
-    .pets-img {
-        width: 300px;
+
+    .lado-derecho {
+
+        min-height: 100vh;
+
+        padding: 20px;
+    }
+
+
+    .tarjeta-login {
+
+        max-width: 440px;
     }
 }
 
 
-.btn-registrar {
-    display: block;
-    width: 100%;
-    margin-top: 14px;
-    padding: 14px;
-    text-align: center;
-    background: #ffffff;
-    color: #2563eb;
-    border: 1px solid #2563eb;
-    border-radius: 10px;
-    text-decoration: none;
-    font-weight: 700;
-    transition: 0.3s;
-}
+/* ================================================================
+   CELULARES PEQUEÑOS
+================================================================ */
 
-.btn-registrar:hover {
-    background: #2563eb;
-    color: #ffffff;
-}
+@media (max-width: 480px) {
 
-.btn-registrar {
-    display: block;
-    width: 100%;
-    margin-top: 14px;
-    padding: 14px;
-    text-align: center;
-    background: #ffffff;
-    color: #2563eb;
-    border: 1px solid #2563eb;
-    border-radius: 10px;
-    text-decoration: none;
-    font-weight: 700;
-    transition: 0.3s;
-}
+    .lado-derecho {
 
-.btn-registrar:hover {
-    background: #2563eb;
-    color: #ffffff;
-}
+        padding: 14px;
+    }
 
-select {
-    width: 100%;
-    padding: 15px;
-    margin-bottom: 22px;
-    border: 1px solid #c7d3e5;
-    border-radius: 10px;
-    font-size: 14px;
-    outline: none;
-    background: #ffffff;
-    color: #1f2937;
-}
 
-select:focus {
-    border-color: #2563eb;
-}
+    .tarjeta-login {
 
-.success {
-    background: #dcfce7;
-    color: #166534;
-    border: 1px solid #86efac;
-}
+        padding:
+            30px 22px;
 
-/* FORMULARIO DE REGISTRO - CAMPOS IGUALES */
-.login-card input[type="text"],
-.login-card input[type="email"],
-.login-card input[type="password"],
-.login-card select {
-    width: 100%;
-    height: 52px;
-    padding: 0 16px;
-    margin-bottom: 22px;
-    border: 1px solid #c7d3e5;
-    border-radius: 10px;
-    font-size: 15px;
-    outline: none;
-    background: #ffffff;
-    color: #1f2937;
-}
+        border-radius: 14px;
+    }
 
-.login-card input:focus,
-.login-card select:focus {
-    border-color: #2563eb;
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
-}
 
-/* BOTÓN REGISTRAR */
-.login-card button {
-    width: 100%;
-    height: 52px;
-    border: none;
-    border-radius: 10px;
-    background: #2563eb;
-    color: #ffffff;
-    font-size: 16px;
-    font-weight: 700;
-    cursor: pointer;
-    margin-top: 4px;
-}
+    .titulo-login {
 
-.login-card button:hover {
-    background: #1d4ed8;
-}
+        font-size: 23px;
+    }
 
-/* BOTÓN VOLVER AL LOGIN */
-.btn-volver {
-    display: block;
-    width: 100%;
-    height: 52px;
-    line-height: 52px;
-    margin-top: 14px;
-    text-align: center;
-    background: #10b981;
-    color: #ffffff;
-    border-radius: 10px;
-    text-decoration: none;
-    font-size: 16px;
-    font-weight: 700;
-}
 
-.btn-volver:hover {
-    background: #059669;
-    color: #ffffff;
-}
+    .campo {
 
-/* BOTÓN REGISTRAR NUEVO USUARIO DEL LOGIN */
-.btn-registrar {
-    display: block;
-    width: 100%;
-    height: 52px;
-    line-height: 52px;
-    margin-top: 14px;
-    text-align: center;
-    background: #ffffff;
-    color: #2563eb;
-    border: 1px solid #2563eb;
-    border-radius: 10px;
-    text-decoration: none;
-    font-size: 16px;
-    font-weight: 700;
-}
+        height: 54px;
 
-.btn-registrar:hover {
-    background: #2563eb;
-    color: #ffffff;
-}
+        font-size: 15px;
+    }
 
-.btn-registro-login {
-    display: block !important;
-    width: 100% !important;
-    height: 52px !important;
-    line-height: 52px !important;
-    margin-top: 14px !important;
-    text-align: center !important;
-    background: #10b981 !important;
-    color: #ffffff !important;
-    border: none !important;
-    border-radius: 10px !important;
-    text-decoration: none !important;
-    font-size: 16px !important;
-    font-weight: 700 !important;
-    cursor: pointer !important;
-}
 
-.btn-registro-login:hover {
-    background: #059669 !important;
-    color: #ffffff !important;
+    .btn-iniciar {
+
+        min-height: 54px;
+
+        font-size: 16px;
+    }
+
+
+    .links-login {
+
+        gap: 8px;
+    }
+
+
+    .links-login a {
+
+        font-size: 14px;
+    }
+
+
+    .volver-login a {
+
+        font-size: 14px;
+    }
 }

@@ -14,29 +14,53 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
 define('BASE_URL', '/clinica_veterinaria_el_campo');
 define('APP_URL', BASE_URL);
 
-function url(string $ruta = ''): string
-{
-    $base = rtrim(BASE_URL, '/');
-    $ruta = ltrim($ruta, '/');
+/*
+|--------------------------------------------------------------------------
+| FUNCIÓN url() — genera rutas absolutas dentro del proyecto
+|--------------------------------------------------------------------------
+*/
 
-    if ($ruta === '') {
-        return $base . '/';
+if (!function_exists('url')) {
+    function url(string $ruta = ''): string
+    {
+        $base = rtrim(BASE_URL, '/');
+        $ruta = ltrim($ruta, '/');
+
+        if ($ruta === '') {
+            return $base . '/';
+        }
+
+        return $base . '/' . $ruta;
     }
-
-    return $base . '/' . $ruta;
 }
 
-function redirect(string $ruta): never
-{
-    header('Location: ' . url($ruta));
-    exit;
+/*
+|--------------------------------------------------------------------------
+| FUNCIÓN redirect() — redirige usando url()
+|--------------------------------------------------------------------------
+*/
+
+if (!function_exists('redirect')) {
+    function redirect(string $ruta): never
+    {
+        header('Location: ' . url($ruta));
+        exit;
+    }
 }
 
-function e(mixed $valor): string
-{
-    return htmlspecialchars(
-        (string) ($valor ?? ''),
-        ENT_QUOTES,
-        'UTF-8'
-    );
+/*
+|--------------------------------------------------------------------------
+| FUNCIÓN e() — escapa texto para HTML (evita XSS)
+|--------------------------------------------------------------------------
+*/
+
+if (!function_exists('e')) {
+    function e(mixed $valor): string
+    {
+        return htmlspecialchars(
+            (string) ($valor ?? ''),
+            ENT_QUOTES,
+            'UTF-8'
+        );
+    }
 }

@@ -372,6 +372,14 @@ if ($flashMessage !== null) {
                 <span>Inventario</span>
             </a>
 
+            <a
+                class="<?= $activePage === 'reporte' ? 'active' : '' ?>"
+                href="<?= e(url('reporte/index.php')) ?>"
+            >
+                <span class="nav-icon">📦</span>
+                <span>reporte</span>
+            </a>
+
             <?php if (is_admin()): ?>
 
                 <a

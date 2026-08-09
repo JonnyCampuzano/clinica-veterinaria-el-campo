@@ -12,7 +12,7 @@ require_once $raiz . '/includes/funciones.php';
 require_once $raiz . '/config/conexion.php';
 require_once $raiz . '/includes/auth.php';
 
-require_login();
+require_permission('clientes.eliminar');
 
 if (!isset($pdo) || !($pdo instanceof PDO)) {
     $_SESSION['flash'] = [

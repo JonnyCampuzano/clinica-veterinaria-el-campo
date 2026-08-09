@@ -1,7 +1,11 @@
 <?php
 declare(strict_types=1);
 
-require_once __DIR__ . '/config/app.php';
+/*
+|--------------------------------------------------------------------------
+| INICIAR SESIÓN
+|--------------------------------------------------------------------------
+*/
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
@@ -9,44 +13,268 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
 
 /*
 |--------------------------------------------------------------------------
-| EVITAR REGRESAR AL LOGIN SI YA EXISTE UNA SESIÓN
+| CONEXIÓN
 |--------------------------------------------------------------------------
 */
 
-if (
-    !empty($_SESSION['usuario_id']) ||
-    !empty($_SESSION['id_usuario'])
-) {
-    redirect('panel.php');
+require_once __DIR__ . '/config/conexion.php';
+
+/*
+|--------------------------------------------------------------------------
+| RUTA AUTOMÁTICA DEL PROYECTO
+|--------------------------------------------------------------------------
+|
+| Esto evita errores 404 / Not Found aunque cambies
+| el nombre de la carpeta del proyecto.
+|
+*/
+
+$rutaBase = str_replace(
+    '\\',
+    '/',
+    dirname($_SERVER['SCRIPT_NAME'] ?? '/')
+);
+
+$rutaBase = rtrim($rutaBase, '/');
+
+if ($rutaBase === '.' || $rutaBase === '/') {
+    $rutaBase = '';
+}
+
+/*
+|--------------------------------------------------------------------------
+| SI YA INICIÓ SESIÓN
+|--------------------------------------------------------------------------
+*/
+
+if (!empty($_SESSION['usuario_id'])) {
+    header('Location: ' . $rutaBase . '/panel.php');
     exit;
 }
 
 /*
 |--------------------------------------------------------------------------
-| RECIBIR MENSAJES
+| VARIABLES
 |--------------------------------------------------------------------------
 */
 
-$error = trim((string) ($_GET['error'] ?? ''));
-$msg = trim((string) ($_GET['msg'] ?? ''));
-
-$errorLogin = trim(
-    (string) ($_SESSION['error_login'] ?? '')
-);
+$error = '';
+$emailIngresado = '';
 
 /*
 |--------------------------------------------------------------------------
-| ELIMINAR MENSAJE DE SESIÓN DESPUÉS DE LEERLO
+| PROCESAR LOGIN
 |--------------------------------------------------------------------------
 */
 
-unset($_SESSION['error_login']);
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
+    $emailIngresado = trim(
+        (string) ($_POST['email'] ?? '')
+    );
+
+    $password = (string) (
+        $_POST['password'] ?? ''
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | VALIDAR CAMPOS
+    |--------------------------------------------------------------------------
+    */
+
+    if ($emailIngresado === '' || $password === '') {
+
+        $error = 'Debes ingresar tu correo y contraseña.';
+
+    } elseif (
+        !filter_var(
+            $emailIngresado,
+            FILTER_VALIDATE_EMAIL
+        )
+    ) {
+
+        $error = 'Ingresa un correo electrónico válido.';
+
+    } else {
+
+        try {
+
+            /*
+            |--------------------------------------------------------------------------
+            | BUSCAR USUARIO
+            |--------------------------------------------------------------------------
+            */
+
+            $sql = "
+                SELECT
+                    id,
+                    nombre,
+                    email,
+                    password,
+                    rol,
+                    estado
+                FROM usuarios
+                WHERE email = :email
+                LIMIT 1
+            ";
+
+            $stmt = $pdo->prepare($sql);
+
+            $stmt->execute([
+                ':email' => $emailIngresado
+            ]);
+
+            $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            /*
+            |--------------------------------------------------------------------------
+            | VALIDAR
+            |--------------------------------------------------------------------------
+            */
+
+            if (!$usuario) {
+
+                $error = 'Correo o contraseña incorrectos.';
+
+            } elseif (
+                !password_verify(
+                    $password,
+                    (string) $usuario['password']
+                )
+            ) {
+
+                $error = 'Correo o contraseña incorrectos.';
+
+            } elseif (
+                strtolower(
+                    trim(
+                        (string) $usuario['estado']
+                    )
+                ) !== 'activo'
+            ) {
+
+                $error = 'Este usuario se encuentra inactivo.';
+
+            } else {
+
+                /*
+                |--------------------------------------------------------------------------
+                | NORMALIZAR ROL
+                |--------------------------------------------------------------------------
+                */
+
+                $rol = strtolower(
+                    trim(
+                        (string) $usuario['rol']
+                    )
+                );
+
+                $rol = str_replace(
+                    ['á', 'é', 'í', 'ó', 'ú'],
+                    ['a', 'e', 'i', 'o', 'u'],
+                    $rol
+                );
+
+                $rol = match ($rol) {
+
+                    'administrador',
+                    'admin'
+                        => 'administrador',
+
+                    'medico',
+                    'medico veterinario',
+                    'veterinario'
+                        => 'medico',
+
+                    'recepcionista',
+                    'recepcion'
+                        => 'recepcionista',
+
+                    default => ''
+                };
+
+                if ($rol === '') {
+
+                    $error = 'El usuario no tiene un rol válido.';
+
+                } else {
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | CREAR SESIÓN
+                    |--------------------------------------------------------------------------
+                    */
+
+                    session_regenerate_id(true);
+
+                    $_SESSION['usuario_id'] =
+                        (int) $usuario['id'];
+
+                    $_SESSION['id_usuario'] =
+                        (int) $usuario['id'];
+
+                    $_SESSION['user_id'] =
+                        (int) $usuario['id'];
+
+                    $_SESSION['id'] =
+                        (int) $usuario['id'];
+
+                    $_SESSION['nombre'] =
+                        (string) $usuario['nombre'];
+
+                    $_SESSION['usuario'] =
+                        (string) $usuario['nombre'];
+
+                    $_SESSION['email'] =
+                        (string) $usuario['email'];
+
+                    /*
+                     * Compatibilidad con otros archivos
+                     * que usen "correo".
+                     */
+
+                    $_SESSION['correo'] =
+                        (string) $usuario['email'];
+
+                    $_SESSION['rol'] = $rol;
+
+                    $_SESSION['estado'] =
+                        (string) $usuario['estado'];
+
+                    $_SESSION['logueado'] = true;
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | REDIRECCIONAR
+                    |--------------------------------------------------------------------------
+                    */
+
+                    header(
+                        'Location: '
+                        . $rutaBase
+                        . '/panel.php'
+                    );
+
+                    exit;
+                }
+            }
+
+        } catch (PDOException $e) {
+
+            $error =
+                'No fue posible iniciar sesión. '
+                . 'Verifica los datos registrados.';
+        }
+    }
+}
 ?>
 
 <!DOCTYPE html>
 <html lang="es">
 
 <head>
+
     <meta charset="UTF-8">
 
     <meta
@@ -54,258 +282,550 @@ unset($_SESSION['error_login']);
         content="width=device-width, initial-scale=1.0"
     >
 
-    <title>Sistema Veterinario | Iniciar sesión</title>
-
-    <link
-        rel="stylesheet"
-        href="<?= e(url('assets/css/login.css')) ?>"
-    >
+    <title>
+        Iniciar sesión | Sistema Veterinario
+    </title>
 
     <style>
-        .boton-registrar-login {
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+
+            min-height: 100vh;
+
+            font-family:
+                "Segoe UI",
+                Arial,
+                sans-serif;
+
+            background: #f7faff;
+        }
+
+        .pagina-login {
+
+            min-height: 100vh;
+
+            display: grid;
+
+            grid-template-columns:
+                1fr 1fr;
+        }
+
+        /* IZQUIERDA */
+
+        .lado-izquierdo {
+
+            background: #f1f7ff;
+
+            border-right:
+                1px solid #d9e6f8;
+
+            display: flex;
+
+            justify-content: center;
+
+            align-items: center;
+
+            padding: 40px;
+        }
+
+        .bienvenida {
+
+            width: 100%;
+
+            max-width: 620px;
+
+            text-align: center;
+        }
+
+        .logo {
+
+            width: 82px;
+            height: 82px;
+
+            margin:
+                0 auto 18px;
+
+            border:
+                2px solid #2563eb;
+
+            border-radius: 50%;
+
+            background: white;
+
+            display: flex;
+
+            justify-content: center;
+
+            align-items: center;
+
+            font-size: 33px;
+        }
+
+        .nombre-sistema {
+
+            color: #1854a6;
+
+            font-size: 35px;
+
+            margin-bottom: 30px;
+        }
+
+        .bienvenida h2 {
+
+            color: #173f88;
+
+            font-size: 26px;
+
+            margin-bottom: 10px;
+        }
+
+        .bienvenida p {
+
+            color: #45536c;
+
+            font-size: 17px;
+
+            margin-bottom: 40px;
+        }
+
+        .mascotas {
+
             display: block;
-            margin-top: 14px;
-            padding: 15px;
-            background: #10b981;
-            color: #ffffff;
+
+            width: 100%;
+
+            max-width: 470px;
+
+            height: auto;
+
+            margin: 0 auto;
+        }
+
+        /* DERECHA */
+
+        .lado-derecho {
+
+            background: #f8fbff;
+
+            display: flex;
+
+            justify-content: center;
+
+            align-items: center;
+
+            padding: 35px;
+        }
+
+        .tarjeta {
+
+            width: 100%;
+
+            max-width: 450px;
+
+            background: white;
+
+            border:
+                1px solid #dce7f5;
+
+            border-radius: 18px;
+
+            padding: 40px;
+
+            box-shadow:
+                0 20px 55px
+                rgba(40, 78, 130, 0.12);
+        }
+
+        .candado {
+
+            width: 58px;
+            height: 58px;
+
+            margin:
+                0 auto 18px;
+
+            border-radius: 15px;
+
+            background: #eff6ff;
+
+            display: flex;
+
+            justify-content: center;
+
+            align-items: center;
+
+            font-size: 23px;
+        }
+
+        .titulo {
+
             text-align: center;
-            text-decoration: none;
-            font-weight: 700;
-            border-radius: 10px;
-            transition:
-                background-color 0.25s ease,
-                transform 0.25s ease;
+
+            font-size: 28px;
+
+            margin-bottom: 32px;
         }
 
-        .boton-registrar-login:hover {
-            background: #059669;
-            transform: translateY(-2px);
-        }
+        .error {
 
-        .alert,
-        .alert-success {
-            margin-bottom: 18px;
             padding: 14px;
+
+            margin-bottom: 25px;
+
+            background: #fff1f1;
+
+            border:
+                1px solid #ffb9b9;
+
             border-radius: 10px;
+
+            color: #c42020;
+
             text-align: center;
-            font-size: 14px;
-            line-height: 1.5;
         }
 
-        .alert {
-            background: #fee2e2;
-            border: 1px solid #fecaca;
-            color: #991b1b;
+        .grupo {
+
+            margin-bottom: 22px;
         }
 
-        .alert-success {
-            background: #dcfce7;
-            border: 1px solid #bbf7d0;
-            color: #166534;
+        .grupo label {
+
+            display: block;
+
+            margin-bottom: 8px;
+
+            font-weight: 700;
         }
+
+        .grupo input {
+
+            width: 100%;
+
+            height: 60px;
+
+            padding:
+                0 18px;
+
+            border:
+                1px solid #bfd0ea;
+
+            border-radius: 10px;
+
+            outline: none;
+
+            font-size: 16px;
+        }
+
+        .grupo input:focus {
+
+            border-color: #2f7d4a;
+
+            box-shadow:
+                0 0 0 3px
+                rgba(47, 125, 74, 0.12);
+        }
+
+        .btn-login {
+
+            width: 100%;
+
+            min-height: 60px;
+
+            border: none;
+
+            border-radius: 10px;
+
+            background: #2f7d4a;
+
+            color: white;
+
+            font-size: 17px;
+
+            font-weight: 700;
+
+            cursor: pointer;
+        }
+
+        .btn-login:hover {
+
+            background: #27693e;
+        }
+
+        .links {
+
+            margin-top: 27px;
+
+            display: flex;
+
+            justify-content: center;
+
+            align-items: center;
+
+            flex-wrap: wrap;
+
+            gap: 12px;
+        }
+
+        .links a {
+
+            color: #147539;
+
+            font-weight: 700;
+
+            text-decoration: none;
+        }
+
+        .links a:hover {
+
+            text-decoration: underline;
+        }
+
+        .separador {
+
+            color: #999;
+        }
+
+        .volver {
+
+            margin-top: 28px;
+
+            text-align: center;
+        }
+
+        .volver a {
+
+            color: #444;
+
+            text-decoration: none;
+        }
+
+        .footer {
+
+            margin-top: 35px;
+
+            text-align: center;
+
+            color: #9aa4b5;
+
+            font-size: 13px;
+        }
+
+        @media (max-width: 850px) {
+
+            .pagina-login {
+
+                display: block;
+            }
+
+            .lado-izquierdo {
+
+                display: none;
+            }
+
+            .lado-derecho {
+
+                min-height: 100vh;
+
+                padding: 20px;
+            }
+        }
+
     </style>
+
 </head>
 
 <body>
 
-<div class="login-wrapper">
+<div class="pagina-login">
 
-    <!-- PARTE IZQUIERDA -->
-    <section class="login-hero">
 
-        <div class="brand">
+    <!-- LADO IZQUIERDO -->
 
-            <div class="brand-icon">
+    <section class="lado-izquierdo">
+
+        <div class="bienvenida">
+
+            <div class="logo">
                 🐾
             </div>
 
-            <h1>
+            <h1 class="nombre-sistema">
                 Sistema Veterinario
             </h1>
-
-        </div>
-
-        <div class="welcome">
 
             <h2>
                 Bienvenido
             </h2>
 
             <p>
-                Inicie sesión para acceder al sistema.
+                Inicie sesión para acceder al sistema
             </p>
+
+            <img
+                src="<?= htmlspecialchars(
+                    $rutaBase . '/assets/img/perro_gato.png',
+                    ENT_QUOTES,
+                    'UTF-8'
+                ) ?>"
+                alt="Perro y gato"
+                class="mascotas"
+            >
 
         </div>
 
-        <img
-            src="<?= e(url('assets/img/perro_gato.png')) ?>"
-            alt="Perro y gato"
-            class="pets-img"
-        >
-
     </section>
 
-    <!-- PARTE DERECHA -->
-    <section class="login-panel">
 
-        <form
-            action="<?= e(url('procesar_login.php')) ?>"
-            method="post"
-            class="login-card"
-            autocomplete="on"
-        >
+    <!-- LADO DERECHO -->
 
-            <div class="lock-icon">
+    <section class="lado-derecho">
+
+        <div class="tarjeta">
+
+            <div class="candado">
                 🔒
             </div>
 
-            <h2>
+            <h2 class="titulo">
                 Iniciar sesión
             </h2>
 
-            <?php if ($errorLogin !== ''): ?>
 
-                <div class="alert">
-                    <?= e($errorLogin) ?>
+            <?php if ($error !== ''): ?>
+
+                <div class="error">
+
+                    <?= htmlspecialchars(
+                        $error,
+                        ENT_QUOTES,
+                        'UTF-8'
+                    ) ?>
+
                 </div>
 
             <?php endif; ?>
 
-            <?php if (isset($_GET['contrasena_actualizada'])): ?>
 
-                <div class="alert-success">
-                    Contraseña actualizada correctamente.
-                    Ya puede iniciar sesión.
-                </div>
-
-            <?php endif; ?>
-
-            <?php if ($msg === 'registro_exitoso'): ?>
-
-                <div class="alert-success">
-                    Usuario registrado correctamente.
-                    Ya puede iniciar sesión.
-                </div>
-
-            <?php endif; ?>
-
-            <?php if ($error === 'campos_vacios'): ?>
-
-                <div class="alert">
-                    Complete todos los campos.
-                </div>
-
-            <?php elseif ($error === 'correo_invalido'): ?>
-
-                <div class="alert">
-                    Ingrese un correo electrónico válido.
-                </div>
-
-            <?php elseif ($error === 'credenciales_invalidas'): ?>
-
-                <div class="alert">
-                    Correo o contraseña incorrectos.
-                </div>
-
-            <?php elseif ($error === 'usuario_inactivo'): ?>
-
-                <div class="alert">
-                    El usuario está inactivo.
-                </div>
-
-            <?php elseif ($error === 'metodo_invalido'): ?>
-
-                <div class="alert">
-                    Solicitud no válida.
-                </div>
-
-            <?php elseif ($error === 'conexion'): ?>
-
-                <div class="alert">
-                    No fue posible conectarse con la base de datos.
-                </div>
-
-            <?php elseif ($error === 'sistema'): ?>
-
-                <div class="alert">
-                    Ocurrió un error en el sistema.
-                    Intente nuevamente.
-                </div>
-
-            <?php endif; ?>
-
-            <label for="correo">
-                Correo electrónico
-            </label>
-
-            <input
-                type="email"
-                id="correo"
-                name="correo"
-                placeholder="Ingrese su correo"
-                maxlength="150"
-                autocomplete="email"
-                required
+            <form
+                action=""
+                method="POST"
             >
 
-            <label for="contrasena">
-                Contraseña
-            </label>
+                <div class="grupo">
 
-            <input
-                type="password"
-                id="contrasena"
-                name="contrasena"
-                placeholder="Ingrese su contraseña"
-                autocomplete="current-password"
-                required
-            >
-
-            <div class="options">
-
-                <label class="remember">
+                    <label for="email">
+                        Correo electrónico
+                    </label>
 
                     <input
-                        type="checkbox"
-                        name="recordarme"
-                        value="1"
+                        type="email"
+                        id="email"
+                        name="email"
+                        placeholder="Ingrese su correo"
+                        value="<?= htmlspecialchars(
+                            $emailIngresado,
+                            ENT_QUOTES,
+                            'UTF-8'
+                        ) ?>"
+                        required
+                        autofocus
                     >
 
-                    Recordarme
+                </div>
 
-                </label>
+
+                <div class="grupo">
+
+                    <label for="password">
+                        Contraseña
+                    </label>
+
+                    <input
+                        type="password"
+                        id="password"
+                        name="password"
+                        placeholder="Ingrese su contraseña"
+                        required
+                    >
+
+                </div>
+
+
+                <button
+                    type="submit"
+                    class="btn-login"
+                >
+                    Iniciar sesión
+                </button>
+
+            </form>
+
+
+            <div class="links">
 
                 <a
-                    href="<?= e(url('recuperar_contrasena.php')) ?>"
+                    href="<?= htmlspecialchars(
+                        $rutaBase . '/recuperar_password.php',
+                        ENT_QUOTES,
+                        'UTF-8'
+                    ) ?>"
                 >
-                    ¿Olvidó su contraseña?
+                    ¿Olvidaste tu contraseña?
+                </a>
+
+
+                <span class="separador">
+                    |
+                </span>
+
+
+                <a
+                    href="<?= htmlspecialchars(
+                        $rutaBase . '/registrar_usuario.php',
+                        ENT_QUOTES,
+                        'UTF-8'
+                    ) ?>"
+                >
+                    Crear usuario
                 </a>
 
             </div>
 
-            <button type="submit">
-                Ingresar
-            </button>
 
-            <a
-                href="<?= e(url('registrar_usuario.php')) ?>"
-                class="boton-registrar-login"
-            >
-                Registrar nuevo usuario
-            </a>
+            <div class="volver">
 
-            <p class="footer">
-                © <?= date('Y') ?> Sistema Veterinario
-            </p>
+                <a
+                    href="<?= htmlspecialchars(
+                        $rutaBase . '/index.php',
+                        ENT_QUOTES,
+                        'UTF-8'
+                    ) ?>"
+                >
+                    ← Volver a la página principal
+                </a>
 
-        </form>
+            </div>
+
+
+            <div class="footer">
+
+                © <?= date('Y') ?>
+                Sistema Veterinario
+
+            </div>
+
+        </div>
 
     </section>
 
 </div>
 
-<script src="<?= e(url('assets/js/app.js')) ?>"></script>
-
 </body>
-
 </html>

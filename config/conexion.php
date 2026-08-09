@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 /*
 |--------------------------------------------------------------------------
-| CONFIGURACIÓN DE LA BASE DE DATOS
+| CONEXIÓN A MYSQL
 |--------------------------------------------------------------------------
 */
 
@@ -16,6 +16,7 @@ $charset = 'utf8mb4';
 $dsn = "mysql:host={$host};dbname={$baseDatos};charset={$charset}";
 
 $opciones = [
+
     PDO::ATTR_ERRMODE =>
         PDO::ERRMODE_EXCEPTION,
 
@@ -27,15 +28,18 @@ $opciones = [
 ];
 
 try {
+
     $pdo = new PDO(
         $dsn,
         $usuario,
         $contrasena,
         $opciones
     );
-} catch (PDOException $error) {
+
+} catch (PDOException $e) {
+
     exit(
-        'No fue posible conectarse con la base de datos: ' .
-        $error->getMessage()
+        'No fue posible conectarse con la base de datos: '
+        . $e->getMessage()
     );
 }
