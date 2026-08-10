@@ -1,31 +1,13 @@
 <?php
 declare(strict_types=1);
 
-/*
-|--------------------------------------------------------------------------
-| REPORTES - CLÍNICA VETERINARIA EL CAMPO
-|--------------------------------------------------------------------------
-*/
 
-/*
-|--------------------------------------------------------------------------
-| AUTENTICACIÓN
-|--------------------------------------------------------------------------
-|
-| Estructura esperada:
-|
-| clinica_veterinaria_el_campo/
-| ├── includes/
-| │   ├── auth.php
-| │   ├── header.php
-| │   └── footer.php
-| ├── reportes/
-| │   └── index.php   ← ESTE ARCHIVO
-| └── panel.php
-|
-*/
 
-require_once dirname(__DIR__) . '/includes/auth.php';
+$raiz = dirname(__DIR__);
+
+require_once $raiz . '/config/app.php';
+require_once $raiz . '/config/conexion.php';
+require_once $raiz . '/includes/auth.php';
 
 
 /*
@@ -64,24 +46,28 @@ if (!function_exists('rep_e')) {
 if (!function_exists('rep_url')) {
     function rep_url(string $ruta = ''): string
     {
-        /*
-        |--------------------------------------------------------------------------
-        | Si tu proyecto ya tiene la función url(), la utilizamos.
-        |--------------------------------------------------------------------------
-        */
+        $ruta = ltrim(trim($ruta), '/');
+
+        // Corrige automáticamente cualquier ruta antigua en singular.
+        if ($ruta === 'reporte' || $ruta === 'reporte/') {
+            $ruta = 'reportes/index.php';
+        } elseif (str_starts_with($ruta, 'reporte/')) {
+            $ruta = 'reportes/' . substr($ruta, strlen('reporte/'));
+        }
 
         if (function_exists('url')) {
             return url($ruta);
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Ruta alternativa
-        |--------------------------------------------------------------------------
-        */
+        $base = defined('APP_URL')
+            ? rtrim((string) APP_URL, '/')
+            : '/clinica_veterinaria_el_campo';
 
-        return '/clinica_veterinaria_el_campo/' .
-            ltrim($ruta, '/');
+        if ($ruta === '') {
+            return $base . '/';
+        }
+
+        return $base . '/' . $ruta;
     }
 }
 

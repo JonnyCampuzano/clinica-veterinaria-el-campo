@@ -373,11 +373,11 @@ if ($flashMessage !== null) {
             </a>
 
             <a
-                class="<?= $activePage === 'reporte' ? 'active' : '' ?>"
-                href="<?= e(url('reporte/index.php')) ?>"
+                class="<?= $activePage === 'reportes' ? 'active' : '' ?>"
+                href="<?= e(url('reportes/index.php')) ?>"
             >
                 <span class="nav-icon">📦</span>
-                <span>reporte</span>
+                <span>reportes</span>
             </a>
 
             <?php if (is_admin()): ?>

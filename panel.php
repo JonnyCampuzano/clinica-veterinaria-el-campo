@@ -177,18 +177,26 @@ $modulos = [
 */
 
 $modulosDisponibles = 0;
+$modulosSinPermiso = 0;
+
 foreach ($modulos as $indice => $modulo) {
     $permitido = can($modulo['permiso']);
     $rutaEncontrada = encontrarRuta($modulo['rutas']);
+    $archivoDisponible = $rutaEncontrada !== null;
 
     $modulos[$indice]['permitido'] = $permitido;
-    $modulos[$indice]['archivo_disponible'] = $rutaEncontrada !== null;
-    $modulos[$indice]['ruta'] = $permitido ? $rutaEncontrada : null;
+    $modulos[$indice]['archivo_disponible'] = $archivoDisponible;
+    $modulos[$indice]['ruta'] = ($permitido && $archivoDisponible)
+        ? $rutaEncontrada
+        : null;
 
-    if ($permitido) {
+    if ($permitido && $archivoDisponible) {
         $modulosDisponibles++;
     }
 
+    if (!$permitido) {
+        $modulosSinPermiso++;
+    }
 }
 
 $totalModulos = count($modulos);
@@ -451,7 +459,7 @@ $inicial = inicialUsuario($nombreUsuario);
         }
 
         .logout-button:hover {
-            background: rgba(220, 38, 38, 0.24);
+            background: rgba(20, 155, 201, 0.24);
             transform: translateY(-2px);
         }
 
@@ -1088,7 +1096,7 @@ $inicial = inicialUsuario($nombreUsuario);
 
         <nav class="sidebar-nav">
 
-            <a class="sidebar-link active" href="panel.php">
+            <a class="sidebar-link active" href="<?= e(url('panel.php')) ?>">
                 <span class="sidebar-icon">🏠</span>
                 Dashboard
             </a>
@@ -1101,7 +1109,7 @@ $inicial = inicialUsuario($nombreUsuario);
 
                     <a
                         class="sidebar-link"
-                        href="<?= e($modulo['ruta']) ?>"
+                        href="<?= e(url($modulo['ruta'])) ?>"
                     >
                         <span class="sidebar-icon">
                             <?= e($modulo['icono']) ?>
@@ -1139,7 +1147,7 @@ $inicial = inicialUsuario($nombreUsuario);
                 </div>
             </div>
 
-            <a class="logout-button" href="logout.php">
+            <a class="logout-button" href="<?= e(url('logout.php')) ?>">
                 🚪 Cerrar sesión
             </a>
 
@@ -1206,7 +1214,7 @@ $inicial = inicialUsuario($nombreUsuario);
 
                     <?php if ($modulos[0]['ruta'] !== null): ?>
                         <a
-                            href="<?= e($modulos[0]['ruta']) ?>"
+                            href="<?= e(url($modulos[0]['ruta'])) ?>"
                             class="btn btn-primary"
                         >
                             👥 Ir a Clientes
@@ -1215,7 +1223,7 @@ $inicial = inicialUsuario($nombreUsuario);
 
                     <?php if ($modulos[2]['ruta'] !== null): ?>
                         <a
-                            href="<?= e($modulos[2]['ruta']) ?>"
+                            href="<?= e(url($modulos[2]['ruta'])) ?>"
                             class="btn btn-outline"
                         >
                             📅 Ver Citas
@@ -1326,7 +1334,7 @@ $inicial = inicialUsuario($nombreUsuario);
 
                             <?php if ($modulo['ruta'] !== null): ?>
                                 <a
-                                    href="<?= e($modulo['ruta']) ?>"
+                                    href="<?= e(url($modulo['ruta'])) ?>"
                                     class="module-button"
                                 >
                                     Abrir módulo →
@@ -1381,7 +1389,7 @@ $inicial = inicialUsuario($nombreUsuario);
 
                     <div class="summary-item">
                         <span>Módulos sin permiso</span>
-                        <strong><?= e((string) $modulosNoDisponibles) ?></strong>
+                        <strong><?= e((string) $modulosSinPermiso) ?></strong>
                     </div>
 
                 </div>
@@ -1400,35 +1408,35 @@ $inicial = inicialUsuario($nombreUsuario);
                 <div class="quick-list">
 
                     <?php if ($modulos[0]['ruta'] !== null): ?>
-                        <a href="<?= e($modulos[0]['ruta']) ?>" class="quick-link">
+                        <a href="<?= e(url($modulos[0]['ruta'])) ?>" class="quick-link">
                             <span class="quick-number">1</span>
                             Administrar clientes
                         </a>
                     <?php endif; ?>
 
                     <?php if ($modulos[1]['ruta'] !== null): ?>
-                        <a href="<?= e($modulos[1]['ruta']) ?>" class="quick-link">
+                        <a href="<?= e(url($modulos[1]['ruta'])) ?>" class="quick-link">
                             <span class="quick-number">2</span>
                             Revisar mascotas
                         </a>
                     <?php endif; ?>
 
                     <?php if ($modulos[2]['ruta'] !== null): ?>
-                        <a href="<?= e($modulos[2]['ruta']) ?>" class="quick-link">
+                        <a href="<?= e(url($modulos[2]['ruta'])) ?>" class="quick-link">
                             <span class="quick-number">3</span>
                             Consultar citas
                         </a>
                     <?php endif; ?>
 
                     <?php if ($modulos[4]['ruta'] !== null): ?>
-                        <a href="<?= e($modulos[4]['ruta']) ?>" class="quick-link">
+                        <a href="<?= e(url($modulos[4]['ruta'])) ?>" class="quick-link">
                             <span class="quick-number">4</span>
                             Ver inventario
                         </a>
                     <?php endif; ?>
 
                     <?php if (isset($modulos[6]) && $modulos[6]['ruta'] !== null): ?>
-                        <a href="<?= e($modulos[6]['ruta']) ?>" class="quick-link">
+                        <a href="<?= e(url($modulos[6]['ruta'])) ?>" class="quick-link">
                             <span class="quick-number">5</span>
                             Consultar reportes
                         </a>
