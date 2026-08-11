@@ -12,21 +12,6 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
 }
 
 
-/*
-|--------------------------------------------------------------------------
-| CONFIGURACIÓN GENERAL
-|--------------------------------------------------------------------------
-|
-| IMPORTANTE:
-| El nombre de BASE_URL debe coincidir exactamente con el nombre
-| de la carpeta de tu proyecto dentro de:
-|
-| C:\xampp\htdocs\
-|
-| Ejemplo:
-| C:\xampp\htdocs\clinica_veterinaria_el_campo\
-|
-*/
 
 if (!defined('APP_NAME')) {
     define(
