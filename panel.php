@@ -248,6 +248,20 @@ $modulos = [
             'inventario/productos.php'
         ]
     ],
+
+
+    [
+        'titulo' => 'Reportes',
+        'icono' => '📊',
+        'descripcion' => 'Estadísticas e informes del sistema veterinario.',
+        'permiso' => 'reportes.ver',
+        'rutas' => [
+            'reportes/index.php'
+        ]
+    ],
+
+
+
     [
         'titulo' => 'Usuarios',
         'icono' => '🔐',
@@ -259,15 +273,7 @@ $modulos = [
             'usuarios/listar_usuarios.php'
         ]
     ],
-    [
-        'titulo' => 'Reportes',
-        'icono' => '📊',
-        'descripcion' => 'Estadísticas e informes del sistema veterinario.',
-        'permiso' => 'reportes.ver',
-        'rutas' => [
-            'reportes/index.php'
-        ]
-    ]
+    
 ];
 
 /*

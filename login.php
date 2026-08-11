@@ -18,6 +18,7 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
 */
 
 require_once __DIR__ . '/config/conexion.php';
+require_once __DIR__ . '/includes/auth.php';
 
 /*
 |--------------------------------------------------------------------------
@@ -191,6 +192,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'recepcion'
                         => 'recepcionista',
 
+                    'cliente',
+                    
+                        => 'cliente',   
+
                     default => ''
                 };
 
@@ -250,12 +255,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     |--------------------------------------------------------------------------
                     */
 
-                    header(
-                        'Location: '
-                        . $rutaBase
-                        . '/panel.php'
-                    );
-
+                    header('Location: ' . $rutaBase . '/' . home_by_role());
                     exit;
                 }
             }
