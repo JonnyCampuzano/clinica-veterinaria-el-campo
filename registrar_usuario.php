@@ -11,13 +11,15 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
 }
 
+
 /*
 |--------------------------------------------------------------------------
-| CONEXIÓN A LA BASE DE DATOS
+| CONEXIÓN
 |--------------------------------------------------------------------------
 */
 
 require_once __DIR__ . '/config/conexion.php';
+
 
 /*
 |--------------------------------------------------------------------------
@@ -30,7 +32,7 @@ $exito = '';
 
 $nombre = '';
 $email = '';
-$rolSeleccionado = 'recepcionista';
+
 
 /*
 |--------------------------------------------------------------------------
@@ -44,13 +46,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         (string) ($_POST['nombre'] ?? '')
     );
 
-    $email = trim(
-        (string) ($_POST['email'] ?? '')
-    );
-
-    $rolSeleccionado = strtolower(
+    $email = strtolower(
         trim(
-            (string) ($_POST['rol'] ?? '')
+            (string) ($_POST['email'] ?? '')
         )
     );
 
@@ -62,16 +60,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_POST['confirmar_password'] ?? ''
     );
 
-    /*
-    |--------------------------------------------------------------------------
-    | ROLES PERMITIDOS EN REGISTRO PÚBLICO
-    |--------------------------------------------------------------------------
-    */
-
-    $rolesPermitidos = [
-        'medico',
-        'recepcionista'
-    ];
 
     /*
     |--------------------------------------------------------------------------
@@ -82,7 +70,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (
         $nombre === ''
         || $email === ''
-        || $rolSeleccionado === ''
         || $password === ''
         || $confirmarPassword === ''
     ) {
@@ -97,16 +84,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     ) {
 
         $error = 'El correo electrónico no es válido.';
-
-    } elseif (
-        !in_array(
-            $rolSeleccionado,
-            $rolesPermitidos,
-            true
-        )
-    ) {
-
-        $error = 'El rol seleccionado no es válido.';
 
     } elseif (
         strlen($password) < 6
@@ -149,34 +126,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $usuarioExistente =
                 $stmtBuscar->fetch(PDO::FETCH_ASSOC);
 
+
             if ($usuarioExistente) {
 
                 $error =
-                    'Ya existe un usuario registrado con ese correo.';
+                    'Ya existe una cuenta registrada con ese correo.';
 
             } else {
 
                 /*
                 |--------------------------------------------------------------------------
-                | CONVERTIR ROL AL FORMATO DE MYSQL
+                | ROL
                 |--------------------------------------------------------------------------
+                |
+                | IMPORTANTE:
+                | Todo usuario creado desde este formulario público
+                | será CLIENTE.
+                |
+                | No puede registrarse como administrador,
+                | recepcionista o médico.
+                |
                 */
 
-                $rolBaseDatos = match ($rolSeleccionado) {
+                $rolBaseDatos = 'Cliente';
 
-                    'medico'
-                        => 'Medico',
-
-                    'recepcionista'
-                        => 'Recepcionista',
-
-                    default
-                        => 'Recepcionista'
-                };
 
                 /*
                 |--------------------------------------------------------------------------
-                | ENCRIPTAR CONTRASEÑA
+                | CONTRASEÑA
                 |--------------------------------------------------------------------------
                 */
 
@@ -186,6 +163,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         PASSWORD_DEFAULT
                     );
 
+
                 /*
                 |--------------------------------------------------------------------------
                 | ESTADO
@@ -193,6 +171,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 */
 
                 $estado = 'Activo';
+
 
                 /*
                 |--------------------------------------------------------------------------
@@ -238,7 +217,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     ':estado' =>
                         $estado
+
                 ]);
+
 
                 /*
                 |--------------------------------------------------------------------------
@@ -246,19 +227,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 |--------------------------------------------------------------------------
                 */
 
-                $exito =
-                    'Usuario registrado correctamente. '
-                    . 'Ya puedes iniciar sesión.';
+                $_SESSION['registro_exitoso'] =
+                    'Cuenta creada correctamente. '
+                    . 'Ahora puedes iniciar sesión para reservar tu cita.';
 
-                $nombre = '';
-                $email = '';
-                $rolSeleccionado = 'recepcionista';
+
+                header('Location: login.php');
+                exit;
             }
 
         } catch (PDOException $e) {
 
+            error_log(
+                'Error al registrar cliente: ' .
+                $e->getMessage()
+            );
+
             $error =
-                'No fue posible registrar el usuario.';
+                'No fue posible registrar la cuenta. '
+                . 'Verifique la base de datos.';
         }
     }
 }
@@ -278,8 +265,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     >
 
     <title>
-        Crear usuario | Sistema Veterinario
+        Crear cuenta | Clínica Veterinaria El Campo
     </title>
+
 
     <style>
 
@@ -288,6 +276,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             padding: 0;
             box-sizing: border-box;
         }
+
 
         body {
 
@@ -315,6 +304,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             padding: 30px;
         }
 
+
         .card {
 
             width: 100%;
@@ -336,11 +326,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 rgba(40, 78, 130, 0.13);
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | ICONO
-        |--------------------------------------------------------------------------
-        */
 
         .icono {
 
@@ -364,11 +349,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             font-size: 30px;
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | TITULO
-        |--------------------------------------------------------------------------
-        */
 
         h1 {
 
@@ -383,22 +363,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             margin-bottom: 10px;
         }
 
+
         .subtitulo {
 
             text-align: center;
 
             color: #748096;
 
-            font-size: 17px;
+            font-size: 16px;
 
             margin-bottom: 34px;
+
+            line-height: 1.5;
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | MENSAJES
-        |--------------------------------------------------------------------------
-        */
 
         .error {
 
@@ -420,36 +398,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             text-align: center;
         }
 
-        .exito {
-
-            padding: 13px;
-
-            margin-bottom: 22px;
-
-            background: #edfaf2;
-
-            border:
-                1px solid #a4dab6;
-
-            border-radius: 10px;
-
-            color: #18723a;
-
-            font-size: 14px;
-
-            text-align: center;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | CAMPOS
-        |--------------------------------------------------------------------------
-        */
 
         .grupo {
 
             margin-bottom: 22px;
         }
+
 
         .grupo label {
 
@@ -463,6 +417,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             font-weight: 700;
         }
+
 
         .campo {
 
@@ -491,6 +446,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 box-shadow .2s;
         }
 
+
         .campo:focus {
 
             border-color: #2f7d4a;
@@ -500,26 +456,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 rgba(47, 125, 74, 0.12);
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | SELECT ROL
-        |--------------------------------------------------------------------------
-        */
 
-        select.campo {
+        .rol-cliente {
 
-            cursor: pointer;
+            display: flex;
 
-            appearance: auto;
+            align-items: center;
 
-            background: #ffffff;
+            gap: 12px;
+
+            padding: 15px 17px;
+
+            margin-bottom: 22px;
+
+            background: #eff6ff;
+
+            border:
+                1px solid #bfdbfe;
+
+            border-radius: 11px;
+
+            color: #1e40af;
+
+            font-size: 15px;
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | BOTÓN
-        |--------------------------------------------------------------------------
-        */
+
+        .rol-cliente strong {
+            color: #174c9b;
+        }
+
 
         .btn {
 
@@ -551,6 +517,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 box-shadow .2s;
         }
 
+
         .btn:hover {
 
             background: #27693e;
@@ -563,11 +530,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 rgba(47, 125, 74, 0.20);
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | VOLVER
-        |--------------------------------------------------------------------------
-        */
 
         .volver {
 
@@ -575,6 +537,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             text-align: center;
         }
+
 
         .volver a {
 
@@ -587,16 +550,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             text-decoration: none;
         }
 
-        .volver a:hover {
 
+        .volver a:hover {
             text-decoration: underline;
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | NOTA
-        |--------------------------------------------------------------------------
-        */
 
         .nota {
 
@@ -617,37 +575,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             text-align: center;
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | RESPONSIVE
-        |--------------------------------------------------------------------------
-        */
 
         @media (max-width: 600px) {
 
             body {
-
                 padding: 15px;
             }
 
             .card {
-
                 padding:
                     30px 22px;
             }
 
             h1 {
-
                 font-size: 25px;
             }
 
             .campo {
-
                 height: 56px;
             }
 
             .btn {
-
                 min-height: 56px;
             }
         }
@@ -656,28 +604,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 </head>
 
+
 <body>
+
 
 <div class="card">
 
+
     <div class="icono">
-        👤
+        🐾
     </div>
 
+
     <h1>
-        Crear usuario
+        Crear cuenta
     </h1>
 
+
     <p class="subtitulo">
-        Sistema Veterinario
+        Clínica Veterinaria El Campo<br>
+        Regístrate para solicitar una cita para tu mascota.
     </p>
 
-
-    <!-- ERROR -->
 
     <?php if ($error !== ''): ?>
 
         <div class="error">
+
+            ⚠️
 
             <?= htmlspecialchars(
                 $error,
@@ -689,25 +643,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <?php endif; ?>
 
-
-    <!-- ÉXITO -->
-
-    <?php if ($exito !== ''): ?>
-
-        <div class="exito">
-
-            <?= htmlspecialchars(
-                $exito,
-                ENT_QUOTES,
-                'UTF-8'
-            ) ?>
-
-        </div>
-
-    <?php endif; ?>
-
-
-    <!-- FORMULARIO -->
 
     <form
         method="POST"
@@ -766,47 +701,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
 
 
-        <!-- ROL -->
+        <!-- ROL FIJO -->
 
-        <div class="grupo">
+        <div class="rol-cliente">
 
-            <label for="rol">
-                Rol
-            </label>
+            <span>
+                👤
+            </span>
 
-            <select
-                id="rol"
-                name="rol"
-                class="campo"
-                required
-            >
+            <div>
 
-                <option
-                    value=""
-                    disabled
-                >
-                    Seleccione un rol
-                </option>
+                Tipo de cuenta:
+                <strong>Cliente</strong>
 
-                <option
-                    value="recepcionista"
-                    <?= $rolSeleccionado === 'recepcionista'
-                        ? 'selected'
-                        : '' ?>
-                >
-                    Recepcionista
-                </option>
+                <br>
 
-                <option
-                    value="medico"
-                    <?= $rolSeleccionado === 'medico'
-                        ? 'selected'
-                        : '' ?>
-                >
-                    Médico Veterinario
-                </option>
+                <small>
+                    Esta cuenta permite únicamente solicitar citas.
+                </small>
 
-            </select>
+            </div>
 
         </div>
 
@@ -825,6 +739,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 name="password"
                 class="campo"
                 placeholder="Mínimo 6 caracteres"
+                minlength="6"
                 required
             >
 
@@ -845,6 +760,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 name="confirmar_password"
                 class="campo"
                 placeholder="Repita la contraseña"
+                minlength="6"
                 required
             >
 
@@ -857,13 +773,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             type="submit"
             class="btn"
         >
-            Registrar usuario
+            🐾 Crear mi cuenta
         </button>
+
 
     </form>
 
-
-    <!-- VOLVER -->
 
     <div class="volver">
 
@@ -876,13 +791,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <div class="nota">
 
-        Los usuarios pueden registrarse como
-        <strong>Recepcionista</strong> o
-        <strong>Médico Veterinario</strong>.
+        Esta cuenta está destinada a clientes
+        de la Clínica Veterinaria El Campo.
+
+        <br>
+
+        <strong>
+            Solo podrá utilizarla para reservar citas.
+        </strong>
 
     </div>
 
+
 </div>
+
 
 </body>
 

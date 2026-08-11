@@ -121,6 +121,27 @@ function citaClaseEstado(mixed $estado): string
     };
 }
 
+
+function citaNormalizarRol(mixed $rol): string
+{
+    $valor = trim((string) $rol);
+
+    if (function_exists('mb_strtolower')) {
+        $valor = mb_strtolower($valor, 'UTF-8');
+    } else {
+        $valor = strtolower($valor);
+    }
+
+    return strtr($valor, [
+        'á' => 'a',
+        'é' => 'e',
+        'í' => 'i',
+        'ó' => 'o',
+        'ú' => 'u',
+        'ñ' => 'n',
+    ]);
+}
+
 /**
  * Busca el primer archivo existente dentro del proyecto.
  */
@@ -144,6 +165,136 @@ function citaRutaDisponible(
     }
 
     return $rutaPredeterminada;
+}
+
+/* =====================================================
+   ROL ACTUAL Y SEGURIDAD DE SOLICITUDES WEB
+===================================================== */
+
+$rolActualNormalizado = citaNormalizarRol(
+    $_SESSION['rol'] ?? $_SESSION['role'] ?? ''
+);
+
+/*
+ * Un cliente público no puede entrar al módulo administrativo
+ * aunque escriba la URL manualmente.
+ */
+if ($rolActualNormalizado === 'cliente') {
+    header('Location: ' . url('citas/reservar.php'));
+    exit;
+}
+
+$puedeGestionarSolicitudes = in_array(
+    $rolActualNormalizado,
+    ['administrador', 'admin', 'recepcionista'],
+    true
+);
+
+if (
+    !isset($_SESSION['csrf_citas']) ||
+    !is_string($_SESSION['csrf_citas']) ||
+    $_SESSION['csrf_citas'] === ''
+) {
+    $_SESSION['csrf_citas'] = bin2hex(random_bytes(32));
+}
+
+$csrfCitas = (string) $_SESSION['csrf_citas'];
+
+$mensajeReservaExito = (string) (
+    $_SESSION['mensaje_reserva_exito'] ?? ''
+);
+
+$mensajeReservaError = (string) (
+    $_SESSION['mensaje_reserva_error'] ?? ''
+);
+
+unset(
+    $_SESSION['mensaje_reserva_exito'],
+    $_SESSION['mensaje_reserva_error']
+);
+
+/* =====================================================
+   CONFIRMAR O CANCELAR SOLICITUD DE CLIENTE
+===================================================== */
+
+if (
+    $_SERVER['REQUEST_METHOD'] === 'POST' &&
+    isset($_POST['accion_reserva'])
+) {
+    if (!$puedeGestionarSolicitudes) {
+        $_SESSION['mensaje_reserva_error'] =
+            'No tienes permiso para confirmar o cancelar solicitudes.';
+
+        header('Location: ' . url('citas/index.php'));
+        exit;
+    }
+
+    $csrfRecibido = (string) ($_POST['csrf_token'] ?? '');
+
+    if (
+        $csrfRecibido === '' ||
+        !hash_equals($csrfCitas, $csrfRecibido)
+    ) {
+        $_SESSION['mensaje_reserva_error'] =
+            'La solicitud de seguridad no es válida. Inténtalo nuevamente.';
+
+        header('Location: ' . url('citas/index.php'));
+        exit;
+    }
+
+    $idReserva = (int) ($_POST['reserva_id'] ?? 0);
+    $accionReserva = strtolower(
+        trim((string) ($_POST['accion_reserva'] ?? ''))
+    );
+
+    $nuevoEstadoReserva = match ($accionReserva) {
+        'confirmar' => 'Confirmada',
+        'cancelar' => 'Cancelada',
+        default => '',
+    };
+
+    if ($idReserva <= 0 || $nuevoEstadoReserva === '') {
+        $_SESSION['mensaje_reserva_error'] =
+            'La solicitud seleccionada no es válida.';
+
+        header('Location: ' . url('citas/index.php'));
+        exit;
+    }
+
+    try {
+        $actualizarReserva = $pdo->prepare(
+            'UPDATE reservas_citas
+             SET estado = :estado
+             WHERE id = :id
+               AND estado = "Pendiente"'
+        );
+
+        $actualizarReserva->execute([
+            ':estado' => $nuevoEstadoReserva,
+            ':id' => $idReserva,
+        ]);
+
+        if ($actualizarReserva->rowCount() > 0) {
+            $_SESSION['mensaje_reserva_exito'] =
+                $nuevoEstadoReserva === 'Confirmada'
+                    ? 'La solicitud del cliente fue confirmada correctamente.'
+                    : 'La solicitud del cliente fue cancelada correctamente.';
+        } else {
+            $_SESSION['mensaje_reserva_error'] =
+                'La solicitud no existe o ya había sido procesada.';
+        }
+    } catch (Throwable $error) {
+        error_log(
+            'Error al cambiar estado de reserva web: ' .
+            $error->getMessage()
+        );
+
+        $_SESSION['mensaje_reserva_error'] =
+            'No fue posible actualizar la solicitud del cliente.';
+    }
+
+    header('Location: ' . url('citas/index.php'));
+    exit;
 }
 
 /* =====================================================
@@ -374,6 +525,78 @@ try {
         'Error: ' .
         $error->getMessage();
 }
+
+/* =====================================================
+   SOLICITUDES DE CITAS REALIZADAS POR CLIENTES
+===================================================== */
+
+$solicitudesClientes = [];
+$tablaReservasDisponible = false;
+
+try {
+    $comprobarTabla = $pdo->query(
+        "SHOW TABLES LIKE 'reservas_citas'"
+    );
+
+    $tablaReservasDisponible =
+        $comprobarTabla->fetchColumn() !== false;
+
+    if ($tablaReservasDisponible) {
+        $sqlSolicitudes = '
+            SELECT
+                id,
+                usuario_id,
+                nombre_cliente,
+                correo_cliente,
+                nombre_mascota,
+                especie,
+                fecha,
+                hora,
+                motivo,
+                estado,
+                fecha_registro
+            FROM reservas_citas
+            ORDER BY
+                CASE
+                    WHEN estado = "Pendiente" THEN 0
+                    WHEN estado = "Confirmada" THEN 1
+                    ELSE 2
+                END,
+                CASE
+                    WHEN fecha >= CURDATE() THEN 0
+                    ELSE 1
+                END,
+                fecha ASC,
+                hora ASC,
+                id DESC
+        ';
+
+        $consultaSolicitudes = $pdo->query($sqlSolicitudes);
+
+        $solicitudesClientes = $consultaSolicitudes->fetchAll(
+            PDO::FETCH_ASSOC
+        );
+    }
+} catch (Throwable $error) {
+    error_log(
+        'Error al consultar solicitudes web: ' .
+        $error->getMessage()
+    );
+
+    $mensajeReservaError =
+        'No se pudieron cargar las solicitudes de citas de clientes.';
+}
+
+$totalSolicitudes = count($solicitudesClientes);
+
+$solicitudesPendientes = count(
+    array_filter(
+        $solicitudesClientes,
+        static fn(array $reserva): bool =>
+            strtolower(trim((string) ($reserva['estado'] ?? '')))
+            === 'pendiente'
+    )
+);
 
 /* =====================================================
    ENCABEZADO
@@ -759,6 +982,100 @@ require_once $raiz . '/includes/header.php';
             margin-right: 18px;
         }
     }
+
+    /* =====================================================
+       SOLICITUDES WEB DE CLIENTES
+    ===================================================== */
+
+    .reservas-panel {
+        margin-top: 24px;
+    }
+
+    .reservas-header-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 28px;
+        padding: 5px 10px;
+        margin-left: 8px;
+        border-radius: 999px;
+        background: #fff7ed;
+        color: #c2410c;
+        font-size: 12px;
+        font-weight: 800;
+        vertical-align: middle;
+    }
+
+    .reserva-cliente strong,
+    .reserva-mascota strong {
+        display: block;
+        color: #1e293b;
+    }
+
+    .reserva-cliente small,
+    .reserva-mascota small {
+        display: block;
+        margin-top: 3px;
+        color: #64748b;
+    }
+
+    .reserva-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+        white-space: nowrap;
+    }
+
+    .reserva-actions form {
+        margin: 0;
+    }
+
+    .reserva-action {
+        min-height: 34px;
+        padding: 7px 10px;
+        border: 0;
+        border-radius: 8px;
+        font: inherit;
+        font-size: 12px;
+        font-weight: 800;
+        cursor: pointer;
+    }
+
+    .reserva-confirmar {
+        background: #f0fdf4;
+        color: #15803d;
+    }
+
+    .reserva-confirmar:hover {
+        background: #dcfce7;
+    }
+
+    .reserva-cancelar {
+        background: #fff1f2;
+        color: #be123c;
+    }
+
+    .reserva-cancelar:hover {
+        background: #ffe4e6;
+    }
+
+    .reserva-solo-lectura {
+        color: #64748b;
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    .reserva-origen {
+        display: inline-flex;
+        align-items: center;
+        padding: 5px 9px;
+        border-radius: 999px;
+        background: #eef2ff;
+        color: #4338ca;
+        font-size: 11px;
+        font-weight: 800;
+    }
+
 </style>
 
 <div class="citas-page">
@@ -1111,6 +1428,339 @@ require_once $raiz . '/includes/header.php';
 
             <?php endif; ?>
         </div>
+    </section>
+
+    <section class="citas-panel reservas-panel">
+
+        <header class="citas-header">
+            <div>
+                <h1>
+                    📥 Solicitudes de citas de clientes
+
+                    <?php if ($solicitudesPendientes > 0): ?>
+                        <span class="reservas-header-badge">
+                            <?= $solicitudesPendientes ?>
+                            pendiente<?= $solicitudesPendientes === 1 ? '' : 's' ?>
+                        </span>
+                    <?php endif; ?>
+                </h1>
+
+                <p>
+                    Solicitudes enviadas desde el registro público de clientes.
+                    Administrador y Recepcionista pueden confirmarlas o cancelarlas.
+                </p>
+            </div>
+
+            <div class="citas-count">
+                <?= $totalSolicitudes ?>
+                solicitud<?= $totalSolicitudes === 1 ? '' : 'es' ?>
+            </div>
+        </header>
+
+        <?php if ($mensajeReservaExito !== ''): ?>
+            <div
+                class="citas-alert citas-alert-success"
+                role="alert"
+            >
+                ✅ <?= citaEscapar($mensajeReservaExito) ?>
+            </div>
+        <?php endif; ?>
+
+        <?php if ($mensajeReservaError !== ''): ?>
+            <div
+                class="citas-alert citas-alert-error"
+                role="alert"
+            >
+                ⚠️ <?= citaEscapar($mensajeReservaError) ?>
+            </div>
+        <?php endif; ?>
+
+        <div class="citas-content">
+
+            <?php if (!$tablaReservasDisponible): ?>
+
+                <div class="citas-empty">
+                    <span>📥</span>
+
+                    <h2>Todavía no existe la tabla de reservas</h2>
+
+                    <p>
+                        La tabla <strong>reservas_citas</strong> se creará
+                        cuando se utilice el formulario público de reservas.
+                    </p>
+                </div>
+
+            <?php elseif ($solicitudesClientes === []): ?>
+
+                <div class="citas-empty">
+                    <span>🐾</span>
+
+                    <h2>No hay solicitudes de clientes</h2>
+
+                    <p>
+                        Cuando un cliente solicite una cita desde la página
+                        pública, aparecerá aquí.
+                    </p>
+                </div>
+
+            <?php else: ?>
+
+                <div class="citas-table-wrapper">
+
+                    <table class="citas-table">
+
+                        <thead>
+                            <tr>
+                                <th>Fecha y hora</th>
+                                <th>Cliente</th>
+                                <th>Mascota</th>
+                                <th>Motivo</th>
+                                <th>Origen</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+
+                            <?php foreach ($solicitudesClientes as $reserva): ?>
+                                <?php
+                                $idReserva = (int) (
+                                    $reserva['id'] ?? 0
+                                );
+
+                                $estadoReserva = trim(
+                                    (string) (
+                                        $reserva['estado'] ?? 'Pendiente'
+                                    )
+                                );
+
+                                $esPendiente =
+                                    strtolower($estadoReserva) === 'pendiente';
+                                ?>
+
+                                <tr>
+
+                                    <td>
+                                        <div class="cita-fecha">
+                                            <strong>
+                                                <?= citaEscapar(
+                                                    citaFechaVisible(
+                                                        $reserva['fecha'] ?? ''
+                                                    )
+                                                ) ?>
+                                            </strong>
+
+                                            <small>
+                                                🕐
+                                                <?= citaEscapar(
+                                                    citaHoraVisible(
+                                                        $reserva['hora'] ?? ''
+                                                    )
+                                                ) ?>
+                                            </small>
+                                        </div>
+                                    </td>
+
+                                    <td>
+                                        <div class="reserva-cliente">
+                                            <strong>
+                                                <?= citaEscapar(
+                                                    citaValorVisible(
+                                                        $reserva[
+                                                            'nombre_cliente'
+                                                        ] ?? '',
+                                                        'Cliente'
+                                                    )
+                                                ) ?>
+                                            </strong>
+
+                                            <small>
+                                                <?= citaEscapar(
+                                                    citaValorVisible(
+                                                        $reserva[
+                                                            'correo_cliente'
+                                                        ] ?? '',
+                                                        'Sin correo'
+                                                    )
+                                                ) ?>
+                                            </small>
+                                        </div>
+                                    </td>
+
+                                    <td>
+                                        <div class="reserva-mascota">
+                                            <strong>
+                                                🐾
+                                                <?= citaEscapar(
+                                                    citaValorVisible(
+                                                        $reserva[
+                                                            'nombre_mascota'
+                                                        ] ?? '',
+                                                        'Sin nombre'
+                                                    )
+                                                ) ?>
+                                            </strong>
+
+                                            <small>
+                                                <?= citaEscapar(
+                                                    citaValorVisible(
+                                                        $reserva['especie'] ?? '',
+                                                        'Sin especie'
+                                                    )
+                                                ) ?>
+                                            </small>
+                                        </div>
+                                    </td>
+
+                                    <td>
+                                        <div class="cita-motivo">
+                                            <?= citaEscapar(
+                                                citaValorVisible(
+                                                    $reserva['motivo'] ?? '',
+                                                    'Sin motivo registrado'
+                                                )
+                                            ) ?>
+                                        </div>
+                                    </td>
+
+                                    <td>
+                                        <span class="reserva-origen">
+                                            🌐 Web pública
+                                        </span>
+                                    </td>
+
+                                    <td>
+                                        <span
+                                            class="cita-estado <?= citaEscapar(
+                                                citaClaseEstado($estadoReserva)
+                                            ) ?>"
+                                        >
+                                            <?= citaEscapar(
+                                                citaValorVisible(
+                                                    $estadoReserva,
+                                                    'Pendiente'
+                                                )
+                                            ) ?>
+                                        </span>
+                                    </td>
+
+                                    <td>
+
+                                        <?php if (
+                                            $esPendiente &&
+                                            $puedeGestionarSolicitudes
+                                        ): ?>
+
+                                            <div class="reserva-actions">
+
+                                                <form
+                                                    method="POST"
+                                                    action=""
+                                                    onsubmit="
+                                                        return confirm(
+                                                            '¿Confirmar esta cita solicitada por el cliente?'
+                                                        );
+                                                    "
+                                                >
+                                                    <input
+                                                        type="hidden"
+                                                        name="csrf_token"
+                                                        value="<?= citaEscapar(
+                                                            $csrfCitas
+                                                        ) ?>"
+                                                    >
+
+                                                    <input
+                                                        type="hidden"
+                                                        name="reserva_id"
+                                                        value="<?= $idReserva ?>"
+                                                    >
+
+                                                    <button
+                                                        class="
+                                                            reserva-action
+                                                            reserva-confirmar
+                                                        "
+                                                        type="submit"
+                                                        name="accion_reserva"
+                                                        value="confirmar"
+                                                    >
+                                                        ✅ Confirmar
+                                                    </button>
+                                                </form>
+
+                                                <form
+                                                    method="POST"
+                                                    action=""
+                                                    onsubmit="
+                                                        return confirm(
+                                                            '¿Cancelar esta solicitud de cita?'
+                                                        );
+                                                    "
+                                                >
+                                                    <input
+                                                        type="hidden"
+                                                        name="csrf_token"
+                                                        value="<?= citaEscapar(
+                                                            $csrfCitas
+                                                        ) ?>"
+                                                    >
+
+                                                    <input
+                                                        type="hidden"
+                                                        name="reserva_id"
+                                                        value="<?= $idReserva ?>"
+                                                    >
+
+                                                    <button
+                                                        class="
+                                                            reserva-action
+                                                            reserva-cancelar
+                                                        "
+                                                        type="submit"
+                                                        name="accion_reserva"
+                                                        value="cancelar"
+                                                    >
+                                                        ❌ Cancelar
+                                                    </button>
+                                                </form>
+
+                                            </div>
+
+                                        <?php elseif ($esPendiente): ?>
+
+                                            <span class="reserva-solo-lectura">
+                                                Solo lectura
+                                            </span>
+
+                                        <?php else: ?>
+
+                                            <span class="reserva-solo-lectura">
+                                                <?= strtolower($estadoReserva)
+                                                    === 'confirmada'
+                                                    ? '✅ Procesada'
+                                                    : '❌ Procesada' ?>
+                                            </span>
+
+                                        <?php endif; ?>
+
+                                    </td>
+
+                                </tr>
+
+                            <?php endforeach; ?>
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            <?php endif; ?>
+
+        </div>
+
     </section>
 </div>
 
