@@ -543,33 +543,35 @@ try {
 
     if ($tablaReservasDisponible) {
         $sqlSolicitudes = '
-            SELECT
-                id,
-                usuario_id,
-                nombre_cliente,
-                correo_cliente,
-                nombre_mascota,
-                especie,
-                fecha,
-                hora,
-                motivo,
-                estado,
-                fecha_registro
-            FROM reservas_citas
-            ORDER BY
-                CASE
-                    WHEN estado = "Pendiente" THEN 0
-                    WHEN estado = "Confirmada" THEN 1
-                    ELSE 2
-                END,
-                CASE
-                    WHEN fecha >= CURDATE() THEN 0
-                    ELSE 1
-                END,
-                fecha ASC,
-                hora ASC,
-                id DESC
-        ';
+    SELECT
+        rc.id,
+        rc.usuario_id,
+        u.nombre AS nombre_cliente,
+        u.email AS correo_cliente,
+        rc.nombre_mascota,
+        rc.especie,
+        rc.fecha,
+        rc.hora,
+        rc.motivo,
+        rc.estado,
+        rc.fecha_registro
+    FROM reservas_citas rc
+    LEFT JOIN usuarios u
+        ON u.id = rc.usuario_id
+    ORDER BY
+        CASE
+            WHEN rc.estado = "Pendiente" THEN 0
+            WHEN rc.estado = "Confirmada" THEN 1
+            ELSE 2
+        END,
+        CASE
+            WHEN rc.fecha >= CURDATE() THEN 0
+            ELSE 1
+        END,
+        rc.fecha ASC,
+        rc.hora ASC,
+        rc.id DESC
+';
 
         $consultaSolicitudes = $pdo->query($sqlSolicitudes);
 
