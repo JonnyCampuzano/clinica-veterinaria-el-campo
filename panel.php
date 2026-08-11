@@ -31,6 +31,106 @@ $nombreRol = role_label(
 
 /*
 |--------------------------------------------------------------------------
+| IMAGEN SEGÚN EL ROL
+|--------------------------------------------------------------------------
+|
+| El sistema busca automáticamente la imagen del rol en varias carpetas
+| comunes. La opción recomendada es:
+|
+| assets/img/roles/administrador.png
+| assets/img/roles/recepcionista.png
+| assets/img/roles/medico_veterinario.png
+|
+*/
+
+$rolClave = strtolower(
+    trim((string) $rolActual)
+);
+
+$rolClave = str_replace(
+    ['á', 'é', 'í', 'ó', 'ú'],
+    ['a', 'e', 'i', 'o', 'u'],
+    $rolClave
+);
+
+$nombresImagenRol = match ($rolClave) {
+    'administrador',
+    'admin' => [
+        'administrador',
+        'admin'
+    ],
+
+    'recepcionista',
+    'recepcion' => [
+        'recepcionista',
+        'recepcion'
+    ],
+
+    'medico',
+    'medico veterinario',
+    'veterinario' => [
+        'medico_veterinario',
+        'medico-veterinario',
+        'medico veterinario',
+        'veterinario',
+        'medico'
+    ],
+
+    default => [
+        'usuario'
+    ]
+};
+
+$carpetasImagenRol = [
+    'assets/img/roles',
+    'assets/img',
+    'assets/imagenes',
+    'assets/images',
+    'imagenes',
+    'img',
+    'images'
+];
+
+$extensionesImagenRol = [
+    'png',
+    'jpg',
+    'jpeg',
+    'webp'
+];
+
+$imagenRol = '';
+$imagenRolExiste = false;
+
+foreach ($carpetasImagenRol as $carpetaImagenRol) {
+
+    foreach ($nombresImagenRol as $nombreImagenRol) {
+
+        foreach ($extensionesImagenRol as $extensionImagenRol) {
+
+            $rutaCandidata =
+                $carpetaImagenRol . '/' .
+                $nombreImagenRol . '.' .
+                $extensionImagenRol;
+
+            $rutaFisicaCandidata = __DIR__
+                . DIRECTORY_SEPARATOR
+                . str_replace(
+                    '/',
+                    DIRECTORY_SEPARATOR,
+                    $rutaCandidata
+                );
+
+            if (is_file($rutaFisicaCandidata)) {
+                $imagenRol = $rutaCandidata;
+                $imagenRolExiste = true;
+                break 3;
+            }
+        }
+    }
+}
+
+/*
+|--------------------------------------------------------------------------
 | FUNCIONES DE APOYO
 |--------------------------------------------------------------------------
 */
@@ -306,7 +406,7 @@ $inicial = inicialUsuario($nombreUsuario);
             background: linear-gradient(
                 180deg,
                 var(--sidebar) 0%,
-                #111827 100%
+                #08499e 100%
             );
             box-shadow: 10px 0 30px rgba(2, 6, 23, 0.12);
             z-index: 100;
@@ -405,62 +505,65 @@ $inicial = inicialUsuario($nombreUsuario);
             border-top: 1px solid rgba(255, 255, 255, 0.08);
         }
 
-        .user-card {
+        /* =========================
+           IMAGEN DEL USUARIO SEGÚN ROL
+           Se muestra en el bloque derecho del Dashboard
+        ========================= */
+
+        .hero-role-card {
+            min-height: 236px;
             display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 14px;
-            border-radius: 16px;
-            background: rgba(255, 255, 255, 0.05);
-            margin-bottom: 12px;
-        }
-
-        .user-avatar {
-            width: 46px;
-            height: 46px;
-            display: grid;
-            place-items: center;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #2563eb, #1d4ed8);
-            color: #fff;
-            font-size: 18px;
-            font-weight: 900;
-            flex: 0 0 46px;
-        }
-
-        .user-card strong {
-            display: block;
-            color: #fff;
-            font-size: 14px;
-        }
-
-        .user-card span {
-            display: block;
-            margin-top: 4px;
-            color: #94a3b8;
-            font-size: 12px;
-        }
-
-        .logout-button {
-            width: 100%;
-            min-height: 46px;
-            display: inline-flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 8px;
-            background: rgba(220, 38, 38, 0.14);
-            border: 1px solid rgba(248, 113, 113, 0.25);
-            color: #fff;
-            border-radius: 12px;
-            font-weight: 800;
-            transition:
-                background-color 0.2s ease,
-                transform 0.2s ease;
+            gap: 10px;
+            padding: 18px;
+            text-align: center;
+            border-radius: 22px;
+            background: rgba(255, 255, 255, 0.14);
+            border: 1px solid rgba(255, 255, 255, 0.22);
+            backdrop-filter: blur(8px);
+            box-shadow: 0 14px 30px rgba(15, 23, 42, 0.12);
         }
 
-        .logout-button:hover {
-            background: rgba(20, 155, 201, 0.24);
-            transform: translateY(-2px);
+        .hero-role-image {
+            width: 138px;
+            height: 150px;
+            display: block;
+            object-fit: cover;
+            object-position: center top;
+            border-radius: 18px;
+            border: 4px solid rgba(255, 255, 255, 0.94);
+            background: #ffffff;
+            box-shadow: 0 12px 28px rgba(15, 23, 42, 0.22);
+        }
+
+        .hero-role-fallback {
+            width: 138px;
+            height: 150px;
+            display: grid;
+            place-items: center;
+            border-radius: 18px;
+            border: 4px solid rgba(255, 255, 255, 0.94);
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.12);
+            box-shadow: 0 12px 28px rgba(15, 23, 42, 0.22);
+            font-size: 42px;
+            font-weight: 900;
+        }
+
+        .hero-role-name {
+            color: #ffffff;
+            font-size: 15px;
+            font-weight: 800;
+            line-height: 1.25;
+        }
+
+        .hero-role-title {
+            color: #dbeafe;
+            font-size: 13px;
+            font-weight: 700;
+            line-height: 1.25;
         }
 
         /* =========================
@@ -1136,17 +1239,6 @@ $inicial = inicialUsuario($nombreUsuario);
 
         <div class="sidebar-footer">
 
-            <div class="user-card">
-                <div class="user-avatar">
-                    <?= e($inicial) ?>
-                </div>
-
-                <div>
-                    <strong><?= e($nombreUsuario) ?></strong>
-                    <span><?= e($nombreRol) ?></span>
-                </div>
-            </div>
-
             <a class="logout-button" href="<?= e(url('logout.php')) ?>">
                 🚪 Cerrar sesión
             </a>
@@ -1236,14 +1328,35 @@ $inicial = inicialUsuario($nombreUsuario);
 
             <div class="hero-side">
 
-                <div class="side-card">
-                    <strong><?= e((string) $modulosDisponibles) ?>/<?= e((string) $totalModulos) ?></strong>
-                    <span>Módulos permitidos para tu rol</span>
-                </div>
+                <div class="hero-role-card">
 
-                <div class="side-card">
-                    <strong><?= e($nombreRol) ?></strong>
-                    <span>Rol actual</span>
+                    <?php if ($imagenRolExiste): ?>
+
+                        <img
+                            class="hero-role-image"
+                            src="<?= e(url($imagenRol)) ?>"
+                            alt="<?= e('Imagen del rol ' . $nombreRol) ?>"
+                        >
+
+                    <?php else: ?>
+
+                        <div
+                            class="hero-role-fallback"
+                            title="Agrega la imagen correspondiente en assets/img/roles/"
+                        >
+                            <?= e($inicial) ?>
+                        </div>
+
+                    <?php endif; ?>
+
+                    <div class="hero-role-name">
+                        <?= e($nombreUsuario) ?>
+                    </div>
+
+                    <div class="hero-role-title">
+                        <?= e($nombreRol) ?>
+                    </div>
+
                 </div>
 
             </div>

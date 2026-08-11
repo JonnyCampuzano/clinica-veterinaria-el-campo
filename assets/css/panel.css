@@ -17,7 +17,7 @@ html {
 body {
     min-height: 100vh;
     background: #f4f7fc;
-    color: #101828;
+    color: #0fbb81;
     font-family:
         Inter,
         Arial,
@@ -271,7 +271,7 @@ a {
     border: 1px solid #9f4351;
     border-radius: 14px;
 
-    background: #512330;
+    background: #85b818;
     color: #ffffff;
 
     font-size: 15px;
@@ -283,7 +283,7 @@ a {
 }
 
 .logout-button:hover {
-    background: #722c3d;
+    background: #97ca09;
     transform: translateY(-1px);
 }
 
