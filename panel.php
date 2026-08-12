@@ -260,8 +260,6 @@ $modulos = [
         ]
     ],
 
-
-
     [
         'titulo' => 'Usuarios',
         'icono' => '🔐',

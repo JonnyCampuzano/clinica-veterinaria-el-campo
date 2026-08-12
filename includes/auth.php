@@ -600,6 +600,7 @@ if (!function_exists('role_permissions')) {
 
                 'reservas.crear',
                 'reservas.ver_propias',
+                'reservas.editar_propias',
                 'reservas.cancelar_propias'
             ];
         }
