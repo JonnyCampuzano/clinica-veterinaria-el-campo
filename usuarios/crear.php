@@ -182,7 +182,7 @@ $mensajeError = '';
 
 $rolesPermitidos = [
     'Administrador',
-    'Veterinario',
+    'Medico',
     'Recepcionista',
     'Usuario'
 ];
@@ -207,7 +207,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ),
 
         'rol' => trim(
-            (string) ($_POST['rol'] ?? 'Usuario')
+            (string) ($_POST['rol'] ?? 'Cliente')
         ),
 
         'estado' => trim(
