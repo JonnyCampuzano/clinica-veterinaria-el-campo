@@ -23,6 +23,33 @@ if ($nombreUsuario === '') {
     $nombreUsuario = 'Usuario';
 }
 
+/*
+|--------------------------------------------------------------------------
+| NOMBRE PARA MOSTRAR EN EL DASHBOARD
+|--------------------------------------------------------------------------
+|
+| Conservamos el nombre completo para la tarjeta del usuario y usamos
+| únicamente el primer nombre en el saludo principal.
+|
+*/
+
+if (function_exists('mb_convert_case')) {
+    $nombreUsuarioMostrar = mb_convert_case(
+        mb_strtolower($nombreUsuario, 'UTF-8'),
+        MB_CASE_TITLE,
+        'UTF-8'
+    );
+} else {
+    $nombreUsuarioMostrar = ucwords(strtolower($nombreUsuario));
+}
+
+$partesNombre = preg_split('/\s+/u', trim($nombreUsuarioMostrar));
+$primerNombreUsuario = $partesNombre[0] ?? 'Usuario';
+
+if ($primerNombreUsuario === '') {
+    $primerNombreUsuario = 'Usuario';
+}
+
 $rolActual = current_role();
 
 $nombreRol = role_label(
@@ -169,6 +196,45 @@ if (!function_exists('inicialUsuario')) {
     }
 }
 
+
+/*
+|--------------------------------------------------------------------------
+| ICONOS SVG DEL DASHBOARD
+|--------------------------------------------------------------------------
+|
+| Iconos integrados directamente en el archivo. No dependen de Internet,
+| Font Awesome ni otras librerías externas.
+|
+*/
+
+if (!function_exists('dashboard_icon')) {
+    function dashboard_icon(string $nombre, int $tamano = 20): string
+    {
+        $iconos = [
+            'home' => '<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><polyline points="9 22 9 12 15 12 15 22"/>',
+            'users' => '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+            'paw' => '<circle cx="5.5" cy="8.5" r="2.2"/><circle cx="10" cy="5.5" r="2.2"/><circle cx="14.5" cy="5.5" r="2.2"/><circle cx="19" cy="8.5" r="2.2"/><path d="M12.25 12.2c-3.2 0-6.1 2.4-6.1 5.1 0 2 1.6 3.2 3.4 3.2 1 0 1.8-.4 2.7-.9.9.5 1.7.9 2.7.9 1.8 0 3.4-1.2 3.4-3.2 0-2.7-2.9-5.1-6.1-5.1Z"/>',
+            'calendar' => '<rect x="3" y="5" width="18" height="16" rx="2"/><line x1="16" y1="3" x2="16" y2="7"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="3" y1="11" x2="21" y2="11"/><path d="M8 15h.01M12 15h.01M16 15h.01M8 18h.01M12 18h.01"/>',
+            'clipboard' => '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4.5V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1.5"/><path d="M9 9h6M9 13h6M9 17h4"/>',
+            'package' => '<path d="m21 8-9 5-9-5"/><path d="M3 8l9-5 9 5v8l-9 5-9-5Z"/><path d="M12 13v8"/><path d="m7.5 5.5 9 5"/>',
+            'chart' => '<path d="M3 3v18h18"/><path d="M7 16v-5M12 16V7M17 16V4"/>',
+            'shield' => '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><circle cx="12" cy="9" r="2"/><path d="M8.8 15c.8-1.7 2-2.5 3.2-2.5s2.4.8 3.2 2.5"/>',
+            'logout' => '<path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M21 19V5a2 2 0 0 0-2-2h-6"/>',
+            'check' => '<circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.2 2.2 4.8-5"/>',
+            'user' => '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+            'clock' => '<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/>',
+            'clinic' => '<path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 13h6"/><path d="M12 10v6"/><path d="M8 21v-3h8v3"/>',
+            'layers' => '<path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/>',
+            'lock' => '<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15" r="1"/>',
+            'arrow-right' => '<path d="M5 12h14"/><path d="m13 6 6 6-6 6"/>',
+        ];
+
+        $contenido = $iconos[$nombre] ?? $iconos['home'];
+
+        return '<svg class="ui-icon" width="' . $tamano . '" height="' . $tamano . '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' . $contenido . '</svg>';
+    }
+}
+
 /*
 |--------------------------------------------------------------------------
 | SALUDO DINÁMICO
@@ -192,7 +258,7 @@ $saludo = match (true) {
 $modulos = [
     [
         'titulo' => 'Clientes',
-        'icono' => '👥',
+        'icono' => 'users',
         'descripcion' => 'Registro y administración de propietarios.',
         'permiso' => 'clientes.ver',
         'rutas' => [
@@ -203,7 +269,7 @@ $modulos = [
     ],
     [
         'titulo' => 'Mascotas',
-        'icono' => '🐾',
+        'icono' => 'paw',
         'descripcion' => 'Registro y seguimiento de mascotas.',
         'permiso' => 'mascotas.ver',
         'rutas' => [
@@ -214,7 +280,7 @@ $modulos = [
     ],
     [
         'titulo' => 'Citas',
-        'icono' => '📅',
+        'icono' => 'calendar',
         'descripcion' => 'Agenda y administración de citas veterinarias.',
         'permiso' => 'citas.ver',
         'rutas' => [
@@ -225,7 +291,7 @@ $modulos = [
     ],
     [
         'titulo' => 'Historia Clínica',
-        'icono' => '📋',
+        'icono' => 'clipboard',
         'descripcion' => 'Consultas, diagnósticos y tratamientos.',
         'permiso' => 'historias.ver',
         'rutas' => [
@@ -239,7 +305,7 @@ $modulos = [
     ],
     [
         'titulo' => 'Inventario',
-        'icono' => '📦',
+        'icono' => 'package',
         'descripcion' => 'Control de productos, medicamentos y existencias.',
         'permiso' => 'inventario.ver',
         'rutas' => [
@@ -252,7 +318,7 @@ $modulos = [
 
     [
         'titulo' => 'Reportes',
-        'icono' => '📊',
+        'icono' => 'chart',
         'descripcion' => 'Estadísticas e informes del sistema veterinario.',
         'permiso' => 'reportes.ver',
         'rutas' => [
@@ -262,7 +328,7 @@ $modulos = [
 
     [
         'titulo' => 'Usuarios',
-        'icono' => '🔐',
+        'icono' => 'shield',
         'descripcion' => 'Administración de usuarios, roles y permisos.',
         'permiso' => 'usuarios.ver',
         'rutas' => [
@@ -309,7 +375,7 @@ $modulosNoDisponibles = $totalModulos - $modulosDisponibles;
 $fechaActual = date('d/m/Y');
 $horaActual = date('H:i');
 $anioActual = date('Y');
-$inicial = inicialUsuario($nombreUsuario);
+$inicial = inicialUsuario($nombreUsuarioMostrar);
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -373,11 +439,20 @@ $inicial = inicialUsuario($nombreUsuario);
 
         body {
             min-height: 100vh;
+            overflow-x: hidden;
             background:
                 radial-gradient(circle at top right, rgba(37, 99, 235, 0.08), transparent 25%),
                 linear-gradient(180deg, #f8fbff 0%, var(--bg) 100%);
             color: var(--text);
-            font-family: "Segoe UI", Arial, sans-serif;
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+            text-rendering: optimizeLegibility;
+        }
+
+        ::selection {
+            color: #0f172a;
+            background: #bfdbfe;
         }
 
         a {
@@ -389,10 +464,16 @@ $inicial = inicialUsuario($nombreUsuario);
             font: inherit;
         }
 
+        a:focus-visible,
+        button:focus-visible {
+            outline: 3px solid rgba(37, 99, 235, 0.28);
+            outline-offset: 3px;
+        }
+
         .app-layout {
             min-height: 100vh;
             display: grid;
-            grid-template-columns: 290px minmax(0, 1fr);
+            grid-template-columns: 270px minmax(0, 1fr);
         }
 
         /* =========================
@@ -405,15 +486,29 @@ $inicial = inicialUsuario($nombreUsuario);
             height: 100vh;
             display: flex;
             flex-direction: column;
-            padding: 22px 18px;
+            padding: 20px 16px;
             color: #cbd5e1;
             background: linear-gradient(
                 180deg,
-                var(--sidebar) 0%,
-                #08499e 100%
+                #0b1f3a 0%,
+                #0f3564 54%,
+                #0b4d8f 100%
             );
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(148, 163, 184, 0.28) transparent;
             box-shadow: 10px 0 30px rgba(2, 6, 23, 0.12);
             z-index: 100;
+        }
+
+        .sidebar::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .sidebar::-webkit-scrollbar-thumb {
+            border-radius: 999px;
+            background: rgba(148, 163, 184, 0.24);
         }
 
         .brand {
@@ -425,15 +520,19 @@ $inicial = inicialUsuario($nombreUsuario);
         }
 
         .brand-logo {
-            width: 54px;
-            height: 54px;
+            width: 50px;
+            height: 50px;
             display: grid;
             place-items: center;
-            border-radius: 16px;
+            border-radius: 15px;
             background: linear-gradient(135deg, #3b82f6, #2563eb);
-            color: #fff;
-            font-size: 26px;
-            box-shadow: 0 12px 26px rgba(37, 99, 235, 0.35);
+            color: #ffffff;
+            box-shadow: 0 10px 24px rgba(37, 99, 235, 0.32);
+        }
+
+        .ui-icon {
+            display: block;
+            flex: 0 0 auto;
         }
 
         .brand-text strong {
@@ -461,52 +560,101 @@ $inicial = inicialUsuario($nombreUsuario);
 
         .sidebar-nav {
             display: grid;
-            gap: 8px;
+            gap: 7px;
         }
 
         .sidebar-link,
         .sidebar-link-disabled {
-            min-height: 48px;
+            position: relative;
+            min-height: 50px;
             display: flex;
             align-items: center;
-            gap: 12px;
-            padding: 12px 14px;
-            border-radius: 12px;
-            font-size: 14px;
+            gap: 11px;
+            padding: 8px 10px;
+            border-radius: 13px;
+            font-size: 13.5px;
             font-weight: 700;
+            letter-spacing: 0.01em;
             transition:
                 transform 0.2s ease,
                 background-color 0.2s ease,
-                color 0.2s ease;
+                color 0.2s ease,
+                box-shadow 0.2s ease;
         }
 
         .sidebar-link {
             color: #cbd5e1;
         }
 
-        .sidebar-link:hover,
+        .sidebar-link:hover {
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.08);
+            transform: translateX(2px);
+        }
+
         .sidebar-link.active {
             color: #ffffff;
-            background: rgba(37, 99, 235, 0.22);
-            transform: translateX(3px);
+            background: rgba(37, 99, 235, 0.34);
+            box-shadow: inset 3px 0 0 #60a5fa;
         }
 
         .sidebar-link-disabled {
-            color: #64748b;
+            color: #71829a;
             cursor: not-allowed;
-            opacity: 0.65;
+            opacity: 0.72;
         }
 
         .sidebar-icon {
-            width: 26px;
-            text-align: center;
-            font-size: 17px;
+            width: 34px;
+            height: 34px;
+            display: grid;
+            place-items: center;
+            flex: 0 0 34px;
+            border-radius: 10px;
+            color: #93c5fd;
+            background: rgba(255, 255, 255, 0.06);
+            transition: background-color 0.2s ease, color 0.2s ease;
+        }
+
+        .sidebar-link:hover .sidebar-icon,
+        .sidebar-link.active .sidebar-icon {
+            color: #ffffff;
+            background: rgba(96, 165, 250, 0.18);
         }
 
         .sidebar-footer {
             margin-top: auto;
             padding-top: 18px;
-            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            border-top: 1px solid rgba(255, 255, 255, 0.09);
+        }
+
+        .logout-button {
+            min-height: 48px;
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            padding: 9px 10px;
+            border-radius: 13px;
+            color: #dbeafe;
+            font-size: 13.5px;
+            font-weight: 700;
+            transition: background-color 0.2s ease, color 0.2s ease;
+        }
+
+        .logout-button:hover {
+            color: #ffffff;
+            background: rgba(239, 68, 68, 0.14);
+        }
+
+        .logout-icon {
+            width: 34px;
+            height: 34px;
+            display: grid;
+            place-items: center;
+            flex: 0 0 34px;
+            border-radius: 10px;
+            color: #fca5a5;
+            background: rgba(239, 68, 68, 0.10);
         }
 
         /* =========================
@@ -515,59 +663,82 @@ $inicial = inicialUsuario($nombreUsuario);
         ========================= */
 
         .hero-role-card {
-            min-height: 236px;
+            min-height: 194px;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 10px;
-            padding: 18px;
+            gap: 7px;
+            padding: 14px 16px;
             text-align: center;
-            border-radius: 22px;
-            background: rgba(255, 255, 255, 0.14);
-            border: 1px solid rgba(255, 255, 255, 0.22);
-            backdrop-filter: blur(8px);
-            box-shadow: 0 14px 30px rgba(15, 23, 42, 0.12);
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.13);
+            border: 1px solid rgba(255, 255, 255, 0.24);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 12px 26px rgba(15, 23, 42, 0.12);
         }
 
         .hero-role-image {
-            width: 138px;
-            height: 150px;
+            width: 108px;
+            height: 118px;
             display: block;
             object-fit: cover;
             object-position: center top;
-            border-radius: 18px;
-            border: 4px solid rgba(255, 255, 255, 0.94);
+            border-radius: 16px;
+            border: 3px solid rgba(255, 255, 255, 0.96);
             background: #ffffff;
-            box-shadow: 0 12px 28px rgba(15, 23, 42, 0.22);
+            box-shadow: 0 10px 22px rgba(15, 23, 42, 0.20);
         }
 
         .hero-role-fallback {
-            width: 138px;
-            height: 150px;
+            width: 108px;
+            height: 118px;
             display: grid;
             place-items: center;
-            border-radius: 18px;
-            border: 4px solid rgba(255, 255, 255, 0.94);
+            border-radius: 16px;
+            border: 3px solid rgba(255, 255, 255, 0.96);
             color: #ffffff;
             background: rgba(255, 255, 255, 0.12);
-            box-shadow: 0 12px 28px rgba(15, 23, 42, 0.22);
-            font-size: 42px;
+            box-shadow: 0 10px 22px rgba(15, 23, 42, 0.20);
+            font-size: 36px;
             font-weight: 900;
         }
 
         .hero-role-name {
+            margin-top: 2px;
             color: #ffffff;
-            font-size: 15px;
+            font-size: 14px;
             font-weight: 800;
-            line-height: 1.25;
+            line-height: 1.2;
         }
 
         .hero-role-title {
             color: #dbeafe;
-            font-size: 13px;
+            font-size: 12.5px;
             font-weight: 700;
-            line-height: 1.25;
+            line-height: 1.2;
+        }
+
+        .hero-role-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 2px;
+            padding: 5px 9px;
+            border-radius: 999px;
+            color: #dcfce7;
+            background: rgba(22, 163, 74, 0.18);
+            border: 1px solid rgba(187, 247, 208, 0.24);
+            font-size: 11px;
+            font-weight: 800;
+        }
+
+        .hero-role-status-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #86efac;
+            box-shadow: 0 0 0 3px rgba(134, 239, 172, 0.12);
         }
 
         /* =========================
@@ -575,8 +746,11 @@ $inicial = inicialUsuario($nombreUsuario);
         ========================= */
 
         .main-content {
+            width: 100%;
+            max-width: 1600px;
             min-width: 0;
-            padding: 26px 28px 40px;
+            margin: 0 auto;
+            padding: 24px 28px 36px;
         }
 
         .topbar {
@@ -584,8 +758,8 @@ $inicial = inicialUsuario($nombreUsuario);
             align-items: center;
             justify-content: space-between;
             gap: 18px;
-            margin-bottom: 24px;
-            padding-bottom: 18px;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
             border-bottom: 1px solid var(--border);
         }
 
@@ -608,9 +782,11 @@ $inicial = inicialUsuario($nombreUsuario);
         }
 
         .page-title h1 {
-            font-size: 30px;
-            line-height: 1.15;
             color: var(--text);
+            font-size: clamp(25px, 2vw, 29px);
+            font-weight: 800;
+            line-height: 1.15;
+            letter-spacing: -0.025em;
         }
 
         .page-title p {
@@ -664,14 +840,15 @@ $inicial = inicialUsuario($nombreUsuario);
             position: relative;
             overflow: hidden;
             display: grid;
-            grid-template-columns: minmax(0, 1fr) 320px;
-            gap: 24px;
-            margin-bottom: 24px;
-            padding: 30px;
-            border-radius: 26px;
+            grid-template-columns: minmax(0, 1fr) 260px;
+            align-items: center;
+            gap: 22px;
+            margin-bottom: 22px;
+            padding: 24px 26px;
+            border-radius: 24px;
             color: #fff;
-            background: linear-gradient(135deg, #0f3d88 0%, #2563eb 55%, #3b82f6 100%);
-            box-shadow: 0 18px 40px rgba(37, 99, 235, 0.22);
+            background: linear-gradient(135deg, #123f86 0%, #2563eb 58%, #3b82f6 100%);
+            box-shadow: 0 16px 34px rgba(37, 99, 235, 0.20);
         }
 
         .hero::after {
@@ -704,44 +881,52 @@ $inicial = inicialUsuario($nombreUsuario);
 
         .hero-label {
             display: inline-block;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             color: #dbeafe;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 900;
-            letter-spacing: 0.12em;
+            letter-spacing: 0.13em;
             text-transform: uppercase;
         }
 
         .hero h2 {
-            font-size: 36px;
-            line-height: 1.15;
-            margin-bottom: 10px;
+            font-size: clamp(28px, 2.2vw, 33px);
+            line-height: 1.12;
+            margin-bottom: 8px;
+            letter-spacing: -0.02em;
+        }
+
+        .hero-wave {
+            display: inline-block;
+            margin-left: 4px;
+            font-size: 0.86em;
+            vertical-align: 0.04em;
         }
 
         .hero p {
-            max-width: 760px;
-            color: rgba(255, 255, 255, 0.92);
-            line-height: 1.7;
-            font-size: 15px;
+            max-width: 730px;
+            color: rgba(255, 255, 255, 0.90);
+            line-height: 1.6;
+            font-size: 14px;
         }
 
         .hero-actions {
             display: flex;
-            gap: 12px;
+            gap: 10px;
             flex-wrap: wrap;
-            margin-top: 22px;
+            margin-top: 18px;
         }
 
         .btn {
-            min-height: 46px;
+            min-height: 42px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
             gap: 8px;
-            padding: 12px 18px;
-            border-radius: 12px;
+            padding: 10px 15px;
+            border-radius: 11px;
             font-weight: 800;
-            font-size: 14px;
+            font-size: 13px;
             transition:
                 transform 0.2s ease,
                 background-color 0.2s ease;
@@ -803,74 +988,138 @@ $inicial = inicialUsuario($nombreUsuario);
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 16px;
-            margin-bottom: 28px;
+            gap: 14px;
+            margin-bottom: 26px;
         }
 
         .stat-card {
+            position: relative;
+            overflow: hidden;
             display: flex;
             align-items: center;
-            gap: 15px;
-            min-height: 122px;
-            padding: 20px;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 20px;
-            box-shadow: var(--shadow-sm);
+            gap: 14px;
+            min-height: 104px;
+            padding: 16px 17px;
+            background: rgba(255, 255, 255, 0.96);
+            border: 1px solid #e5e7eb;
+            border-radius: 18px;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.055);
+            transition:
+                transform 0.2s ease,
+                box-shadow 0.2s ease,
+                border-color 0.2s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            border-color: #dbeafe;
+            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+        }
+
+        .stat-card::after {
+            content: "";
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 3px;
+            opacity: 0.85;
+        }
+
+        .stat-card.stat-blue::after {
+            background: linear-gradient(90deg, #2563eb, #93c5fd);
+        }
+
+        .stat-card.stat-green::after {
+            background: linear-gradient(90deg, #16a34a, #86efac);
+        }
+
+        .stat-card.stat-violet::after {
+            background: linear-gradient(90deg, #7c3aed, #c4b5fd);
+        }
+
+        .stat-card.stat-orange::after {
+            background: linear-gradient(90deg, #d97706, #fcd34d);
         }
 
         .stat-icon {
-            width: 56px;
-            height: 56px;
+            width: 48px;
+            height: 48px;
             display: grid;
             place-items: center;
-            border-radius: 16px;
-            font-size: 25px;
-            flex: 0 0 56px;
+            border-radius: 14px;
+            flex: 0 0 48px;
+        }
+
+        .stat-icon svg {
+            width: 22px;
+            height: 22px;
         }
 
         .stat-icon.blue {
             color: #1d4ed8;
-            background: #dbeafe;
+            background: #eff6ff;
+            border: 1px solid #dbeafe;
         }
 
         .stat-icon.green {
             color: #15803d;
-            background: #dcfce7;
+            background: #f0fdf4;
+            border: 1px solid #dcfce7;
         }
 
         .stat-icon.violet {
             color: #6d28d9;
-            background: #ede9fe;
+            background: #f5f3ff;
+            border: 1px solid #ede9fe;
         }
 
         .stat-icon.orange {
             color: #b45309;
-            background: #fef3c7;
+            background: #fffbeb;
+            border: 1px solid #fef3c7;
+        }
+
+        .stat-info {
+            min-width: 0;
         }
 
         .stat-info small {
             display: block;
             color: #64748b;
-            font-size: 12px;
+            font-size: 10.5px;
             font-weight: 800;
-            letter-spacing: 0.03em;
+            letter-spacing: 0.055em;
             text-transform: uppercase;
         }
 
         .stat-info strong {
             display: block;
-            margin-top: 6px;
+            margin-top: 4px;
             color: #0f172a;
-            font-size: 17px;
+            font-size: 24px;
+            line-height: 1.15;
+            letter-spacing: -0.02em;
+        }
+
+        .stat-info strong.stat-value-text {
+            font-size: 16px;
+            letter-spacing: 0;
+        }
+
+        .stat-info strong.stat-value-date {
+            font-size: 14px;
             line-height: 1.3;
+            letter-spacing: 0;
+            white-space: nowrap;
         }
 
         .stat-info span {
             display: block;
-            margin-top: 5px;
+            margin-top: 4px;
             color: #64748b;
-            font-size: 13px;
+            font-size: 12px;
+            line-height: 1.35;
         }
 
         /* =========================
@@ -899,33 +1148,92 @@ $inicial = inicialUsuario($nombreUsuario);
         .module-grid {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 18px;
+            gap: 16px;
             margin-bottom: 28px;
         }
 
         .module-card {
+            --module-accent: #2563eb;
+            --module-soft: #eff6ff;
+            --module-border: #dbeafe;
+
+            position: relative;
+            overflow: hidden;
             display: flex;
             flex-direction: column;
-            min-height: 220px;
-            padding: 22px;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 22px;
-            box-shadow: var(--shadow-sm);
+            min-height: 196px;
+            padding: 19px;
+            background: rgba(255, 255, 255, 0.98);
+            border: 1px solid #e5e7eb;
+            border-radius: 19px;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
             transition:
                 transform 0.22s ease,
                 box-shadow 0.22s ease,
                 border-color 0.22s ease;
         }
 
+        .module-card::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: var(--module-accent);
+            opacity: 0.9;
+        }
+
+        .module-card:nth-child(2) {
+            --module-accent: #16a34a;
+            --module-soft: #f0fdf4;
+            --module-border: #dcfce7;
+        }
+
+        .module-card:nth-child(3) {
+            --module-accent: #7c3aed;
+            --module-soft: #f5f3ff;
+            --module-border: #ede9fe;
+        }
+
+        .module-card:nth-child(4) {
+            --module-accent: #0891b2;
+            --module-soft: #ecfeff;
+            --module-border: #cffafe;
+        }
+
+        .module-card:nth-child(5) {
+            --module-accent: #d97706;
+            --module-soft: #fffbeb;
+            --module-border: #fef3c7;
+        }
+
+        .module-card:nth-child(6) {
+            --module-accent: #4f46e5;
+            --module-soft: #eef2ff;
+            --module-border: #e0e7ff;
+        }
+
+        .module-card:nth-child(7) {
+            --module-accent: #475569;
+            --module-soft: #f8fafc;
+            --module-border: #e2e8f0;
+        }
+
         .module-card:hover {
-            transform: translateY(-4px);
-            border-color: #bfdbfe;
-            box-shadow: var(--shadow-md);
+            transform: translateY(-3px);
+            border-color: var(--module-border);
+            box-shadow: 0 14px 32px rgba(15, 23, 42, 0.09);
         }
 
         .module-card.disabled {
-            opacity: 0.72;
+            opacity: 0.7;
+            filter: saturate(0.75);
+        }
+
+        .module-card.disabled:hover {
+            transform: none;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
         }
 
         .module-top {
@@ -933,47 +1241,69 @@ $inicial = inicialUsuario($nombreUsuario);
             align-items: center;
             justify-content: space-between;
             gap: 10px;
-            margin-bottom: 16px;
+            margin-bottom: 13px;
         }
 
         .module-badge {
-            width: 58px;
-            height: 58px;
+            width: 48px;
+            height: 48px;
             display: grid;
             place-items: center;
-            border-radius: 18px;
-            background: #eff6ff;
-            font-size: 28px;
+            border-radius: 14px;
+            color: var(--module-accent);
+            background: var(--module-soft);
+            border: 1px solid var(--module-border);
+            transition: transform 0.2s ease;
+        }
+
+        .module-card:hover .module-badge {
+            transform: scale(1.04);
         }
 
         .module-status {
-            padding: 7px 11px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 9px;
             border-radius: 999px;
-            font-size: 12px;
+            border: 1px solid transparent;
+            font-size: 11px;
             font-weight: 800;
+            line-height: 1;
+        }
+
+        .module-status-dot {
+            width: 6px;
+            height: 6px;
+            flex: 0 0 6px;
+            border-radius: 50%;
+            background: currentColor;
         }
 
         .status-active {
-            color: #166534;
-            background: #dcfce7;
+            color: #15803d;
+            background: #f0fdf4;
+            border-color: #dcfce7;
         }
 
         .status-disabled {
-            color: #92400e;
-            background: #fef3c7;
+            color: #a16207;
+            background: #fffbeb;
+            border-color: #fef3c7;
         }
 
         .module-card h4 {
-            font-size: 19px;
+            margin-bottom: 6px;
             color: var(--text);
-            margin-bottom: 8px;
+            font-size: 18px;
+            line-height: 1.3;
         }
 
         .module-card p {
+            margin-bottom: 15px;
             color: var(--muted);
-            line-height: 1.65;
-            font-size: 14px;
-            margin-bottom: 18px;
+            font-size: 13px;
+            line-height: 1.55;
         }
 
         .module-actions {
@@ -983,42 +1313,57 @@ $inicial = inicialUsuario($nombreUsuario);
         .module-button,
         .module-button-disabled {
             width: 100%;
-            min-height: 46px;
+            min-height: 42px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
             gap: 8px;
-            border-radius: 12px;
-            font-size: 14px;
+            border-radius: 11px;
+            font-size: 13px;
             font-weight: 800;
         }
 
         .module-button {
-            color: #fff;
-            background: var(--primary);
+            color: #ffffff;
+            background: var(--module-accent);
+            box-shadow: 0 6px 14px color-mix(in srgb, var(--module-accent) 18%, transparent);
             transition:
-                background-color 0.2s ease,
-                transform 0.2s ease;
+                filter 0.2s ease,
+                transform 0.2s ease,
+                box-shadow 0.2s ease;
+        }
+
+        .module-button .ui-icon {
+            transition: transform 0.2s ease;
         }
 
         .module-button:hover {
-            background: var(--primary-dark);
-            transform: translateY(-2px);
+            filter: brightness(0.94);
+            transform: translateY(-1px);
+            box-shadow: 0 8px 18px color-mix(in srgb, var(--module-accent) 23%, transparent);
+        }
+
+        .module-button:hover .ui-icon {
+            transform: translateX(3px);
         }
 
         .module-button-disabled {
             color: #64748b;
-            background: #e2e8f0;
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
             cursor: not-allowed;
         }
 
         .bottom-grid {
             display: grid;
-            grid-template-columns: 1.1fr 0.9fr;
+            grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
             gap: 18px;
+            align-items: stretch;
         }
 
         .info-card {
+            position: relative;
+            overflow: hidden;
             padding: 22px;
             background: var(--surface);
             border: 1px solid var(--border);
@@ -1026,66 +1371,276 @@ $inicial = inicialUsuario($nombreUsuario);
             box-shadow: var(--shadow-sm);
         }
 
-        .summary-list,
-        .quick-list {
-            display: grid;
-            gap: 12px;
-            margin-top: 16px;
+        .info-card::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #2563eb, #60a5fa);
         }
 
-        .summary-item {
+        .info-card.quick-card::before {
+            background: linear-gradient(90deg, #16a34a, #4ade80);
+        }
+
+        .info-card-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 12px;
-            padding: 14px 16px;
-            background: var(--surface-soft);
-            border: 1px solid var(--border);
-            border-radius: 14px;
+            gap: 14px;
+            margin-bottom: 18px;
         }
 
-        .summary-item span {
-            color: var(--muted);
-            font-size: 14px;
-        }
-
-        .summary-item strong {
-            color: var(--text);
-            font-size: 14px;
-            text-align: right;
-        }
-
-        .quick-link {
+        .info-card-heading {
             display: flex;
             align-items: center;
             gap: 12px;
-            padding: 15px 16px;
-            background: var(--surface-soft);
-            border: 1px solid var(--border);
-            border-radius: 14px;
+            min-width: 0;
+        }
+
+        .info-card-heading-icon {
+            width: 42px;
+            height: 42px;
+            display: grid;
+            place-items: center;
+            flex: 0 0 42px;
+            border-radius: 13px;
+            color: #1d4ed8;
+            background: #eff6ff;
+            border: 1px solid #dbeafe;
+        }
+
+        .quick-card .info-card-heading-icon {
+            color: #15803d;
+            background: #f0fdf4;
+            border-color: #dcfce7;
+        }
+
+        .info-card-heading h3 {
+            color: var(--text);
+            font-size: 19px;
+            line-height: 1.2;
+        }
+
+        .info-card-heading p {
+            margin-top: 4px;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.4;
+        }
+
+        .info-card-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            flex: 0 0 auto;
+            padding: 7px 10px;
+            border-radius: 999px;
+            color: #166534;
+            background: #f0fdf4;
+            border: 1px solid #dcfce7;
+            font-size: 11px;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        .info-card-pill .dot {
+            width: 7px;
+            height: 7px;
+        }
+
+        .summary-list,
+        .quick-list {
+            display: grid;
+            gap: 10px;
+        }
+
+        .summary-item {
+            display: grid;
+            grid-template-columns: 42px minmax(0, 1fr) auto;
+            align-items: center;
+            gap: 12px;
+            min-height: 62px;
+            padding: 10px 12px;
+            background: #fbfdff;
+            border: 1px solid #e8eef7;
+            border-radius: 15px;
+            transition:
+                transform 0.18s ease,
+                border-color 0.18s ease,
+                box-shadow 0.18s ease;
+        }
+
+        .summary-item:hover {
+            transform: translateY(-1px);
+            border-color: #dbeafe;
+            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.045);
+        }
+
+        .summary-icon {
+            width: 38px;
+            height: 38px;
+            display: grid;
+            place-items: center;
+            border-radius: 12px;
+            color: #2563eb;
+            background: #eff6ff;
+            border: 1px solid #dbeafe;
+        }
+
+        .summary-icon.green {
+            color: #15803d;
+            background: #f0fdf4;
+            border-color: #dcfce7;
+        }
+
+        .summary-icon.violet {
+            color: #6d28d9;
+            background: #f5f3ff;
+            border-color: #ede9fe;
+        }
+
+        .summary-icon.orange {
+            color: #b45309;
+            background: #fffbeb;
+            border-color: #fef3c7;
+        }
+
+        .summary-icon.slate {
+            color: #475569;
+            background: #f8fafc;
+            border-color: #e2e8f0;
+        }
+
+        .summary-copy {
+            min-width: 0;
+        }
+
+        .summary-copy span {
+            display: block;
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 700;
+            line-height: 1.3;
+        }
+
+        .summary-copy small {
+            display: block;
+            margin-top: 2px;
+            color: #94a3b8;
+            font-size: 11px;
+            line-height: 1.3;
+        }
+
+        .summary-value {
+            max-width: 230px;
+            color: var(--text);
+            font-size: 13px;
+            font-weight: 850;
+            line-height: 1.35;
+            text-align: right;
+            overflow-wrap: anywhere;
+        }
+
+        .quick-link {
+            display: grid;
+            grid-template-columns: 44px minmax(0, 1fr) 24px;
+            align-items: center;
+            gap: 12px;
+            min-height: 64px;
+            padding: 10px 12px;
+            color: var(--text);
+            background: #fbfdff;
+            border: 1px solid #e8eef7;
+            border-radius: 15px;
             transition:
                 transform 0.2s ease,
                 border-color 0.2s ease,
+                box-shadow 0.2s ease,
                 background-color 0.2s ease;
         }
 
         .quick-link:hover {
-            transform: translateX(4px);
+            transform: translateX(3px);
             border-color: #bfdbfe;
-            background: #f8fbff;
+            background: #ffffff;
+            box-shadow: 0 9px 20px rgba(15, 23, 42, 0.055);
         }
 
-        .quick-number {
-            width: 30px;
-            height: 30px;
+        .quick-icon {
+            width: 42px;
+            height: 42px;
             display: grid;
             place-items: center;
-            border-radius: 50%;
+            border-radius: 13px;
             color: #1d4ed8;
-            background: #dbeafe;
+            background: #eff6ff;
+            border: 1px solid #dbeafe;
+            transition: transform 0.2s ease;
+        }
+
+        .quick-link:hover .quick-icon {
+            transform: scale(1.04);
+        }
+
+        .quick-icon.green {
+            color: #15803d;
+            background: #f0fdf4;
+            border-color: #dcfce7;
+        }
+
+        .quick-icon.violet {
+            color: #6d28d9;
+            background: #f5f3ff;
+            border-color: #ede9fe;
+        }
+
+        .quick-icon.orange {
+            color: #b45309;
+            background: #fffbeb;
+            border-color: #fef3c7;
+        }
+
+        .quick-icon.cyan {
+            color: #0e7490;
+            background: #ecfeff;
+            border-color: #cffafe;
+        }
+
+        .quick-copy {
+            min-width: 0;
+        }
+
+        .quick-copy strong {
+            display: block;
+            color: var(--text);
             font-size: 13px;
-            font-weight: 900;
-            flex: 0 0 30px;
+            font-weight: 850;
+            line-height: 1.3;
+        }
+
+        .quick-copy span {
+            display: block;
+            margin-top: 3px;
+            color: var(--muted);
+            font-size: 11px;
+            line-height: 1.35;
+        }
+
+        .quick-arrow {
+            display: grid;
+            place-items: center;
+            color: #94a3b8;
+            transition:
+                color 0.2s ease,
+                transform 0.2s ease;
+        }
+
+        .quick-link:hover .quick-arrow {
+            color: var(--primary);
+            transform: translateX(2px);
         }
 
         .footer-note {
@@ -1093,6 +1648,30 @@ $inicial = inicialUsuario($nombreUsuario);
             text-align: center;
             color: var(--muted);
             font-size: 13px;
+        }
+
+        .sidebar-overlay {
+            position: fixed;
+            inset: 0;
+            display: none;
+            background: rgba(15, 23, 42, 0.46);
+            backdrop-filter: blur(2px);
+            z-index: 90;
+        }
+
+        .sidebar-overlay.visible {
+            display: block;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                scroll-behavior: auto !important;
+                transition-duration: 0.01ms !important;
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+            }
         }
 
         /* =========================
@@ -1120,8 +1699,8 @@ $inicial = inicialUsuario($nombreUsuario);
 
             .sidebar {
                 position: fixed;
-                left: -300px;
-                width: 290px;
+                left: -285px;
+                width: 270px;
                 transition: left 0.25s ease;
             }
 
@@ -1135,7 +1714,8 @@ $inicial = inicialUsuario($nombreUsuario);
             }
 
             .main-content {
-                padding: 22px 18px 36px;
+                max-width: none;
+                padding: 20px 18px 32px;
             }
 
             .hero {
@@ -1143,7 +1723,7 @@ $inicial = inicialUsuario($nombreUsuario);
             }
 
             .hero-side {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
+                grid-template-columns: 1fr;
             }
         }
 
@@ -1178,6 +1758,118 @@ $inicial = inicialUsuario($nombreUsuario);
                 flex-direction: column;
                 align-items: flex-start;
             }
+
+            .info-card-header {
+                align-items: flex-start;
+            }
+
+            .info-card-pill {
+                display: none;
+            }
+
+            .summary-item {
+                grid-template-columns: 40px minmax(0, 1fr);
+            }
+
+            .summary-value {
+                grid-column: 2;
+                max-width: none;
+                margin-top: -5px;
+                text-align: left;
+            }
+        }
+
+        @media (max-width: 520px) {
+            .main-content {
+                padding: 16px 12px 28px;
+            }
+
+            .topbar {
+                gap: 12px;
+                margin-bottom: 16px;
+                padding-bottom: 13px;
+            }
+
+            .topbar-badges {
+                width: 100%;
+                gap: 8px;
+            }
+
+            .badge {
+                padding: 8px 10px;
+                font-size: 11.5px;
+            }
+
+            .hero {
+                gap: 16px;
+                margin-bottom: 18px;
+                padding: 20px 16px;
+                border-radius: 19px;
+            }
+
+            .hero h2 {
+                font-size: 25px;
+            }
+
+            .hero p {
+                font-size: 13px;
+            }
+
+            .hero-actions {
+                display: grid;
+                grid-template-columns: 1fr;
+            }
+
+            .btn {
+                width: 100%;
+            }
+
+            .hero-role-card {
+                min-height: 0;
+            }
+
+            .stats-grid {
+                gap: 11px;
+            }
+
+            .stat-card {
+                min-height: 94px;
+                padding: 14px;
+                border-radius: 16px;
+            }
+
+            .module-grid {
+                gap: 13px;
+            }
+
+            .module-card,
+            .info-card {
+                border-radius: 17px;
+            }
+
+            .module-card {
+                min-height: 0;
+                padding: 17px;
+            }
+
+            .info-card {
+                padding: 17px;
+            }
+
+            .quick-link {
+                grid-template-columns: 40px minmax(0, 1fr) 20px;
+                gap: 10px;
+            }
+
+            .quick-icon {
+                width: 38px;
+                height: 38px;
+            }
+
+            .footer-note {
+                margin-top: 20px;
+                font-size: 11.5px;
+            }
         }
     </style>
 </head>
@@ -1189,7 +1881,7 @@ $inicial = inicialUsuario($nombreUsuario);
     <aside class="sidebar" id="sidebar">
 
         <div class="brand">
-            <div class="brand-logo">🐾</div>
+            <div class="brand-logo"><?= dashboard_icon('paw', 24) ?></div>
 
             <div class="brand-text">
                 <strong>Clínica Veterinaria</strong>
@@ -1204,7 +1896,7 @@ $inicial = inicialUsuario($nombreUsuario);
         <nav class="sidebar-nav">
 
             <a class="sidebar-link active" href="<?= e(url('panel.php')) ?>">
-                <span class="sidebar-icon">🏠</span>
+                <span class="sidebar-icon"><?= dashboard_icon('home', 19) ?></span>
                 Dashboard
             </a>
 
@@ -1219,7 +1911,7 @@ $inicial = inicialUsuario($nombreUsuario);
                         href="<?= e(url($modulo['ruta'])) ?>"
                     >
                         <span class="sidebar-icon">
-                            <?= e($modulo['icono']) ?>
+                            <?= dashboard_icon($modulo['icono'], 19) ?>
                         </span>
 
                         <?= e($modulo['titulo']) ?>
@@ -1229,7 +1921,7 @@ $inicial = inicialUsuario($nombreUsuario);
 
                     <span class="sidebar-link-disabled">
                         <span class="sidebar-icon">
-                            <?= e($modulo['icono']) ?>
+                            <?= dashboard_icon($modulo['icono'], 19) ?>
                         </span>
 
                         <?= e($modulo['titulo']) ?>
@@ -1244,12 +1936,15 @@ $inicial = inicialUsuario($nombreUsuario);
         <div class="sidebar-footer">
 
             <a class="logout-button" href="<?= e(url('logout.php')) ?>">
-                🚪 Cerrar sesión
+                <span class="logout-icon"><?= dashboard_icon('logout', 19) ?></span>
+                <span>Cerrar sesión</span>
             </a>
 
         </div>
 
     </aside>
+
+    <div class="sidebar-overlay" id="sidebarOverlay" aria-hidden="true"></div>
 
     <main class="main-content">
 
@@ -1262,8 +1957,10 @@ $inicial = inicialUsuario($nombreUsuario);
                     id="menuButton"
                     type="button"
                     aria-label="Abrir menú"
+                    aria-controls="sidebar"
+                    aria-expanded="false"
                 >
-                    ☰
+                    <svg class="ui-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></svg>
                 </button>
 
                 <div class="page-title">
@@ -1281,7 +1978,7 @@ $inicial = inicialUsuario($nombreUsuario);
                 </div>
 
                 <div class="badge badge-primary">
-                    📅 <?= e($fechaActual) ?> · <?= e($horaActual) ?>
+                    <?= dashboard_icon('calendar', 17) ?> <?= e($fechaActual) ?> · <?= e($horaActual) ?>
                 </div>
 
             </div>
@@ -1297,13 +1994,13 @@ $inicial = inicialUsuario($nombreUsuario);
                 </span>
 
                 <h2>
-                    <?= e($saludo) ?>, <?= e($nombreUsuario) ?>
+                    <?= e($saludo) ?>, <?= e($primerNombreUsuario) ?>
+                    <span class="hero-wave" aria-hidden="true">👋</span>
                 </h2>
 
                 <p>
-                    Gestiona clientes, mascotas, citas, historias clínicas,
-                    inventario, usuarios y reportes desde una sola interfaz profesional,
-                    rápida y organizada.
+                    Administra clientes, mascotas, citas, historias clínicas e inventario
+                    desde un solo lugar, de forma rápida y organizada.
                 </p>
 
                 <div class="hero-actions">
@@ -1313,7 +2010,7 @@ $inicial = inicialUsuario($nombreUsuario);
                             href="<?= e(url($modulos[0]['ruta'])) ?>"
                             class="btn btn-primary"
                         >
-                            👥 Ir a Clientes
+                            <?= dashboard_icon('users', 18) ?> Clientes
                         </a>
                     <?php endif; ?>
 
@@ -1322,7 +2019,7 @@ $inicial = inicialUsuario($nombreUsuario);
                             href="<?= e(url($modulos[2]['ruta'])) ?>"
                             class="btn btn-outline"
                         >
-                            📅 Ver Citas
+                            <?= dashboard_icon('calendar', 18) ?> Ver citas
                         </a>
                     <?php endif; ?>
 
@@ -1354,11 +2051,16 @@ $inicial = inicialUsuario($nombreUsuario);
                     <?php endif; ?>
 
                     <div class="hero-role-name">
-                        <?= e($nombreUsuario) ?>
+                        <?= e($nombreUsuarioMostrar) ?>
                     </div>
 
                     <div class="hero-role-title">
                         <?= e($nombreRol) ?>
+                    </div>
+
+                    <div class="hero-role-status">
+                        <span class="hero-role-status-dot"></span>
+                        Activo
                     </div>
 
                 </div>
@@ -1369,43 +2071,43 @@ $inicial = inicialUsuario($nombreUsuario);
 
         <section class="stats-grid">
 
-            <article class="stat-card">
-                <div class="stat-icon blue">📦</div>
+            <article class="stat-card stat-blue">
+                <div class="stat-icon blue"><?= dashboard_icon('package', 22) ?></div>
 
                 <div class="stat-info">
                     <small>Total de módulos</small>
                     <strong><?= e((string) $totalModulos) ?></strong>
-                    <span>Áreas registradas en el sistema</span>
+                    <span>Áreas registradas</span>
                 </div>
             </article>
 
-            <article class="stat-card">
-                <div class="stat-icon green">✅</div>
+            <article class="stat-card stat-green">
+                <div class="stat-icon green"><?= dashboard_icon('check', 22) ?></div>
 
                 <div class="stat-info">
                     <small>Módulos permitidos</small>
                     <strong><?= e((string) $modulosDisponibles) ?></strong>
-                    <span>Según los permisos de tu rol</span>
+                    <span>Disponibles para tu rol</span>
                 </div>
             </article>
 
-            <article class="stat-card">
-                <div class="stat-icon violet">👤</div>
+            <article class="stat-card stat-violet">
+                <div class="stat-icon violet"><?= dashboard_icon('user', 22) ?></div>
 
                 <div class="stat-info">
                     <small>Rol actual</small>
-                    <strong><?= e($nombreRol) ?></strong>
-                    <span>Permisos asignados al usuario</span>
+                    <strong class="stat-value-text"><?= e($nombreRol) ?></strong>
+                    <span>Perfil de acceso activo</span>
                 </div>
             </article>
 
-            <article class="stat-card">
-                <div class="stat-icon orange">🕐</div>
+            <article class="stat-card stat-orange">
+                <div class="stat-icon orange"><?= dashboard_icon('clock', 22) ?></div>
 
                 <div class="stat-info">
                     <small>Fecha y hora</small>
-                    <strong><?= e($fechaActual) ?> · <?= e($horaActual) ?></strong>
-                    <span>Última actualización visual</span>
+                    <strong class="stat-value-date"><?= e($fechaActual) ?> · <?= e($horaActual) ?></strong>
+                    <span>Hora local del sistema</span>
                 </div>
             </article>
 
@@ -1429,15 +2131,17 @@ $inicial = inicialUsuario($nombreUsuario);
 
                         <div class="module-top">
                             <div class="module-badge">
-                                <?= e($modulo['icono']) ?>
+                                <?= dashboard_icon($modulo['icono'], 27) ?>
                             </div>
 
                             <?php if ($modulo['ruta'] !== null): ?>
                                 <span class="module-status status-active">
+                                    <span class="module-status-dot"></span>
                                     Disponible
                                 </span>
                             <?php else: ?>
                                 <span class="module-status status-disabled">
+                                    <span class="module-status-dot"></span>
                                     No disponible
                                 </span>
                             <?php endif; ?>
@@ -1454,7 +2158,8 @@ $inicial = inicialUsuario($nombreUsuario);
                                     href="<?= e(url($modulo['ruta'])) ?>"
                                     class="module-button"
                                 >
-                                    Abrir módulo →
+                                    Abrir módulo
+                                    <?= dashboard_icon('arrow-right', 17) ?>
                                 </a>
                             <?php else: ?>
                                 <span class="module-button-disabled">
@@ -1475,87 +2180,208 @@ $inicial = inicialUsuario($nombreUsuario);
 
             <div class="info-card">
 
-                <div class="section-header">
-                    <div>
-                        <h3>Resumen del sistema</h3>
-                        <p>Información general de la sesión actual.</p>
+                <div class="info-card-header">
+                    <div class="info-card-heading">
+                        <div class="info-card-heading-icon">
+                            <?= dashboard_icon('clinic', 20) ?>
+                        </div>
+
+                        <div>
+                            <h3>Resumen del sistema</h3>
+                            <p>Datos principales de tu sesión y nivel de acceso.</p>
+                        </div>
                     </div>
+
+                    <span class="info-card-pill">
+                        <span class="dot"></span>
+                        Sesión activa
+                    </span>
                 </div>
 
                 <div class="summary-list">
 
                     <div class="summary-item">
-                        <span>Nombre del sistema</span>
-                        <strong>Clínica Veterinaria El Campo</strong>
+                        <div class="summary-icon">
+                            <?= dashboard_icon('clinic', 18) ?>
+                        </div>
+
+                        <div class="summary-copy">
+                            <span>Nombre del sistema</span>
+                            <small>Aplicación administrativa</small>
+                        </div>
+
+                        <strong class="summary-value">
+                            Clínica Veterinaria El Campo
+                        </strong>
                     </div>
 
                     <div class="summary-item">
-                        <span>Usuario activo</span>
-                        <strong><?= e($nombreUsuario) ?></strong>
+                        <div class="summary-icon green">
+                            <?= dashboard_icon('user', 18) ?>
+                        </div>
+
+                        <div class="summary-copy">
+                            <span>Usuario activo</span>
+                            <small>Sesión iniciada actualmente</small>
+                        </div>
+
+                        <strong class="summary-value">
+                            <?= e($nombreUsuarioMostrar) ?>
+                        </strong>
                     </div>
 
                     <div class="summary-item">
-                        <span>Rol asignado</span>
-                        <strong><?= e($nombreRol) ?></strong>
+                        <div class="summary-icon violet">
+                            <?= dashboard_icon('shield', 18) ?>
+                        </div>
+
+                        <div class="summary-copy">
+                            <span>Rol asignado</span>
+                            <small>Nivel de acceso del usuario</small>
+                        </div>
+
+                        <strong class="summary-value">
+                            <?= e($nombreRol) ?>
+                        </strong>
                     </div>
 
                     <div class="summary-item">
-                        <span>Módulos permitidos para tu rol</span>
-                        <strong><?= e((string) $modulosDisponibles) ?> de <?= e((string) $totalModulos) ?></strong>
+                        <div class="summary-icon orange">
+                            <?= dashboard_icon('layers', 18) ?>
+                        </div>
+
+                        <div class="summary-copy">
+                            <span>Módulos permitidos</span>
+                            <small>Disponibles para tu rol</small>
+                        </div>
+
+                        <strong class="summary-value">
+                            <?= e((string) $modulosDisponibles) ?> de <?= e((string) $totalModulos) ?>
+                        </strong>
                     </div>
 
                     <div class="summary-item">
-                        <span>Módulos sin permiso</span>
-                        <strong><?= e((string) $modulosSinPermiso) ?></strong>
+                        <div class="summary-icon slate">
+                            <?= dashboard_icon('lock', 18) ?>
+                        </div>
+
+                        <div class="summary-copy">
+                            <span>Módulos sin permiso</span>
+                            <small>Restringidos para tu rol actual</small>
+                        </div>
+
+                        <strong class="summary-value">
+                            <?= e((string) $modulosSinPermiso) ?>
+                        </strong>
                     </div>
 
                 </div>
 
             </div>
 
-            <div class="info-card">
+            <div class="info-card quick-card">
 
-                <div class="section-header">
-                    <div>
-                        <h3>Acciones rápidas</h3>
-                        <p>Atajos para trabajar más rápido.</p>
+                <div class="info-card-header">
+                    <div class="info-card-heading">
+                        <div class="info-card-heading-icon">
+                            <?= dashboard_icon('arrow-right', 20) ?>
+                        </div>
+
+                        <div>
+                            <h3>Acciones rápidas</h3>
+                            <p>Accesos directos a las tareas más utilizadas.</p>
+                        </div>
                     </div>
+
+                    <span class="info-card-pill">
+                        <?= e((string) $modulosDisponibles) ?> accesos
+                    </span>
                 </div>
 
                 <div class="quick-list">
 
                     <?php if ($modulos[0]['ruta'] !== null): ?>
                         <a href="<?= e(url($modulos[0]['ruta'])) ?>" class="quick-link">
-                            <span class="quick-number">1</span>
-                            Administrar clientes
+                            <span class="quick-icon">
+                                <?= dashboard_icon('users', 19) ?>
+                            </span>
+
+                            <span class="quick-copy">
+                                <strong>Administrar clientes</strong>
+                                <span>Registrar y consultar propietarios.</span>
+                            </span>
+
+                            <span class="quick-arrow">
+                                <?= dashboard_icon('arrow-right', 17) ?>
+                            </span>
                         </a>
                     <?php endif; ?>
 
                     <?php if ($modulos[1]['ruta'] !== null): ?>
                         <a href="<?= e(url($modulos[1]['ruta'])) ?>" class="quick-link">
-                            <span class="quick-number">2</span>
-                            Revisar mascotas
+                            <span class="quick-icon green">
+                                <?= dashboard_icon('paw', 19) ?>
+                            </span>
+
+                            <span class="quick-copy">
+                                <strong>Revisar mascotas</strong>
+                                <span>Consultar fichas y datos de mascotas.</span>
+                            </span>
+
+                            <span class="quick-arrow">
+                                <?= dashboard_icon('arrow-right', 17) ?>
+                            </span>
                         </a>
                     <?php endif; ?>
 
                     <?php if ($modulos[2]['ruta'] !== null): ?>
                         <a href="<?= e(url($modulos[2]['ruta'])) ?>" class="quick-link">
-                            <span class="quick-number">3</span>
-                            Consultar citas
+                            <span class="quick-icon violet">
+                                <?= dashboard_icon('calendar', 19) ?>
+                            </span>
+
+                            <span class="quick-copy">
+                                <strong>Consultar citas</strong>
+                                <span>Revisar la agenda veterinaria.</span>
+                            </span>
+
+                            <span class="quick-arrow">
+                                <?= dashboard_icon('arrow-right', 17) ?>
+                            </span>
                         </a>
                     <?php endif; ?>
 
                     <?php if ($modulos[4]['ruta'] !== null): ?>
                         <a href="<?= e(url($modulos[4]['ruta'])) ?>" class="quick-link">
-                            <span class="quick-number">4</span>
-                            Ver inventario
+                            <span class="quick-icon orange">
+                                <?= dashboard_icon('package', 19) ?>
+                            </span>
+
+                            <span class="quick-copy">
+                                <strong>Ver inventario</strong>
+                                <span>Controlar productos y existencias.</span>
+                            </span>
+
+                            <span class="quick-arrow">
+                                <?= dashboard_icon('arrow-right', 17) ?>
+                            </span>
                         </a>
                     <?php endif; ?>
 
-                    <?php if (isset($modulos[6]) && $modulos[6]['ruta'] !== null): ?>
-                        <a href="<?= e(url($modulos[6]['ruta'])) ?>" class="quick-link">
-                            <span class="quick-number">5</span>
-                            Consultar reportes
+                    <?php if (isset($modulos[5]) && $modulos[5]['ruta'] !== null): ?>
+                        <a href="<?= e(url($modulos[5]['ruta'])) ?>" class="quick-link">
+                            <span class="quick-icon cyan">
+                                <?= dashboard_icon('chart', 19) ?>
+                            </span>
+
+                            <span class="quick-copy">
+                                <strong>Consultar reportes</strong>
+                                <span>Visualizar estadísticas e informes.</span>
+                            </span>
+
+                            <span class="quick-arrow">
+                                <?= dashboard_icon('arrow-right', 17) ?>
+                            </span>
                         </a>
                     <?php endif; ?>
 
@@ -1576,20 +2402,51 @@ $inicial = inicialUsuario($nombreUsuario);
 <script>
     const menuButton = document.getElementById('menuButton');
     const sidebar = document.getElementById('sidebar');
+    const sidebarOverlay = document.getElementById('sidebarOverlay');
+
+    function setSidebarState(open) {
+        if (!sidebar || !menuButton) return;
+
+        sidebar.classList.toggle('open', open);
+        menuButton.setAttribute('aria-expanded', open ? 'true' : 'false');
+        menuButton.setAttribute('aria-label', open ? 'Cerrar menú' : 'Abrir menú');
+
+        if (sidebarOverlay) {
+            sidebarOverlay.classList.toggle('visible', open);
+            sidebarOverlay.setAttribute('aria-hidden', open ? 'false' : 'true');
+        }
+    }
 
     if (menuButton && sidebar) {
         menuButton.addEventListener('click', function () {
-            sidebar.classList.toggle('open');
+            const isOpen = sidebar.classList.contains('open');
+            setSidebarState(!isOpen);
         });
 
-        document.addEventListener('click', function (event) {
-            const clickDentroMenu =
-                sidebar.contains(event.target) ||
-                menuButton.contains(event.target);
+        if (sidebarOverlay) {
+            sidebarOverlay.addEventListener('click', function () {
+                setSidebarState(false);
+            });
+        }
 
-            if (window.innerWidth <= 980 && !clickDentroMenu) {
-                sidebar.classList.remove('open');
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape') {
+                setSidebarState(false);
             }
+        });
+
+        window.addEventListener('resize', function () {
+            if (window.innerWidth > 980) {
+                setSidebarState(false);
+            }
+        });
+
+        sidebar.querySelectorAll('a').forEach(function (link) {
+            link.addEventListener('click', function () {
+                if (window.innerWidth <= 980) {
+                    setSidebarState(false);
+                }
+            });
         });
     }
 </script>
