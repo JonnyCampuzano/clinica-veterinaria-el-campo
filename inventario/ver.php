@@ -3,6 +3,19 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/_bootstrap.php';
 
+/*
+|--------------------------------------------------------------------------
+| PROTECCIÓN REAL DE LA URL
+|--------------------------------------------------------------------------
+| Solo los roles con permiso inventario.ver pueden consultar productos.
+|--------------------------------------------------------------------------
+*/
+
+require_permission('inventario.ver');
+
+$puedeEditar = can('inventario.editar');
+
+
 $id = filter_input(
     INPUT_GET,
     'id',
@@ -96,16 +109,19 @@ require_once __DIR__ . '/_styles.php';
             </div>
 
             <div class="inv-header-actions">
-                <a
-                    class="inv-btn inv-btn-warning"
-                    href="<?= inv_e(
-                        inv_url(
-                            'inventario/editar.php?id=' . $id
-                        )
-                    ) ?>"
-                >
-                    ✏️ Editar
-                </a>
+
+                <?php if ($puedeEditar): ?>
+                    <a
+                        class="inv-btn inv-btn-warning"
+                        href="<?= inv_e(
+                            inv_url(
+                                'inventario/editar.php?id=' . $id
+                            )
+                        ) ?>"
+                    >
+                        ✏️ Editar
+                    </a>
+                <?php endif; ?>
 
                 <a
                     class="inv-btn inv-btn-secondary"
@@ -115,6 +131,7 @@ require_once __DIR__ . '/_styles.php';
                 >
                     Volver
                 </a>
+
             </div>
         </header>
 

@@ -320,79 +320,145 @@ if ($flashMessage !== null) {
         <!-- MENÚ PRINCIPAL -->
 
         <nav
-            class="nav-menu"
-            aria-label="Menú principal"
+    class="nav-menu"
+    aria-label="Menú principal"
+>
+
+    <!-- DASHBOARD -->
+
+    <?php if (can('dashboard.ver')): ?>
+
+        <a
+            class="<?= $activePage === 'dashboard' ? 'active' : '' ?>"
+            href="<?= e(url('panel.php')) ?>"
         >
+            <span class="nav-icon">🏠</span>
+            <span>Panel</span>
+        </a>
 
-            <a
-                class="<?= $activePage === 'dashboard' ? 'active' : '' ?>"
-                href="<?= e(url('panel.php')) ?>"
-            >
-                <span class="nav-icon">🏠</span>
-                <span>Panel</span>
-            </a>
+    <?php endif; ?>
 
-            <a
-                class="<?= $activePage === 'clientes' ? 'active' : '' ?>"
-                href="<?= e(url('clientes/index.php')) ?>"
-            >
-                <span class="nav-icon">👥</span>
-                <span>Clientes</span>
-            </a>
 
-            <a
-                class="<?= $activePage === 'mascotas' ? 'active' : '' ?>"
-                href="<?= e(url('mascotas/index.php')) ?>"
-            >
-                <span class="nav-icon">🐕</span>
-                <span>Mascotas</span>
-            </a>
+    <!-- CLIENTES -->
 
-            <a
-                class="<?= $activePage === 'citas' ? 'active' : '' ?>"
-                href="<?= e(url('citas/index.php')) ?>"
-            >
-                <span class="nav-icon">📅</span>
-                <span>Citas</span>
-            </a>
+    <?php if (can('clientes.ver')): ?>
 
-            <a
-                class="<?= $activePage === 'consultas' ? 'active' : '' ?>"
-                href="<?= e(url('consultas/index.php')) ?>"
-            >
-                <span class="nav-icon">🩺</span>
-                <span>Historia clínica</span>
-            </a>
+        <a
+            class="<?= $activePage === 'clientes' ? 'active' : '' ?>"
+            href="<?= e(url('clientes/index.php')) ?>"
+        >
+            <span class="nav-icon">👥</span>
+            <span>Clientes</span>
+        </a>
 
-            <a
-                class="<?= $activePage === 'inventario' ? 'active' : '' ?>"
-                href="<?= e(url('inventario/index.php')) ?>"
-            >
-                <span class="nav-icon">📦</span>
-                <span>Inventario</span>
-            </a>
+    <?php endif; ?>
 
-            <a
-                class="<?= $activePage === 'reportes' ? 'active' : '' ?>"
-                href="<?= e(url('reportes/index.php')) ?>"
-            >
-                <span class="nav-icon">📦</span>
-                <span>reportes</span>
-            </a>
 
-            <?php if (is_admin()): ?>
+    <!-- MASCOTAS -->
 
-                <a
-                    class="<?= $activePage === 'usuarios' ? 'active' : '' ?>"
-                    href="<?= e(url('usuarios/index.php')) ?>"
-                >
-                    <span class="nav-icon">🔐</span>
-                    <span>Usuarios</span>
-                </a>
+    <?php if (can('mascotas.ver')): ?>
 
-            <?php endif; ?>
+        <a
+            class="<?= $activePage === 'mascotas' ? 'active' : '' ?>"
+            href="<?= e(url('mascotas/index.php')) ?>"
+        >
+            <span class="nav-icon">🐾</span>
+            <span>Mascotas</span>
+        </a>
 
-        </nav>
+    <?php endif; ?>
+
+
+    <!-- CITAS -->
+
+    <?php if (can('citas.ver')): ?>
+
+        <a
+            class="<?= $activePage === 'citas' ? 'active' : '' ?>"
+            href="<?= e(url('citas/index.php')) ?>"
+        >
+            <span class="nav-icon">📅</span>
+            <span>Citas</span>
+        </a>
+
+    <?php endif; ?>
+
+
+    <!-- HISTORIA CLÍNICA -->
+
+    <?php if (can('historias.ver')): ?>
+
+        <a
+            class="<?= $activePage === 'consultas' || $activePage === 'historias' ? 'active' : '' ?>"
+            href="<?= e(url('consultas/index.php')) ?>"
+        >
+            <span class="nav-icon">🩺</span>
+            <span>Historia clínica</span>
+        </a>
+
+    <?php endif; ?>
+
+
+    <!-- INVENTARIO -->
+
+    <?php if (can('inventario.ver')): ?>
+
+        <a
+            class="<?= $activePage === 'inventario' ? 'active' : '' ?>"
+            href="<?= e(url('inventario/index.php')) ?>"
+        >
+            <span class="nav-icon">📦</span>
+            <span>Inventario</span>
+        </a>
+
+    <?php endif; ?>
+
+
+    <!-- REPORTES -->
+
+    <?php if (can('reportes.ver')): ?>
+
+        <a
+            class="<?= $activePage === 'reportes' ? 'active' : '' ?>"
+            href="<?= e(url('reportes/index.php')) ?>"
+        >
+            <span class="nav-icon">📊</span>
+            <span>Reportes</span>
+        </a>
+
+    <?php endif; ?>
+
+
+    <!-- USUARIOS -->
+
+    <?php if (can('usuarios.ver')): ?>
+
+        <a
+            class="<?= $activePage === 'usuarios' ? 'active' : '' ?>"
+            href="<?= e(url('usuarios/index.php')) ?>"
+        >
+            <span class="nav-icon">🔐</span>
+            <span>Usuarios</span>
+        </a>
+
+    <?php endif; ?>
+
+
+    <!-- CONFIGURACIÓN -->
+
+    <?php if (can('configuracion.ver')): ?>
+
+        <a
+            class="<?= $activePage === 'configuracion' ? 'active' : '' ?>"
+            href="<?= e(url('configuracion/index.php')) ?>"
+        >
+            <span class="nav-icon">⚙️</span>
+            <span>Configuración</span>
+        </a>
+
+    <?php endif; ?>
+
+</nav>
 
         <!-- PARTE INFERIOR DEL MENÚ -->
 

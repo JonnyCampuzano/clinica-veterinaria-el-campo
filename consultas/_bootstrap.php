@@ -18,7 +18,16 @@ require_once $raiz . '/includes/funciones.php';
 require_once $raiz . '/config/conexion.php';
 require_once $raiz . '/includes/auth.php';
 
-require_login();
+/*
+|--------------------------------------------------------------------------
+| PROTECCIÓN REAL DEL MÓDULO
+|--------------------------------------------------------------------------
+| Todo archivo de Historia Clínica que cargue este _bootstrap.php
+| requiere como mínimo permiso para consultar historias clínicas.
+|--------------------------------------------------------------------------
+*/
+
+require_permission('historias.ver');
 
 if (!isset($pdo) || !($pdo instanceof PDO)) {
     exit(

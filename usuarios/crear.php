@@ -20,7 +20,15 @@ require_once $raiz . '/includes/funciones.php';
 require_once $raiz . '/config/conexion.php';
 require_once $raiz . '/includes/auth.php';
 
-require_login();
+/*
+|--------------------------------------------------------------------------
+| PROTECCIÓN REAL DE LA URL
+|--------------------------------------------------------------------------
+| Solo los roles con permiso usuarios.crear pueden registrar usuarios.
+|--------------------------------------------------------------------------
+*/
+
+require_permission('usuarios.crear');
 
 /* =====================================================
    FUNCIONES DE RESPALDO
@@ -50,30 +58,6 @@ if (!function_exists('url')) {
             ? $base
             : $base . '/' . $ruta;
     }
-}
-
-/* =====================================================
-   VALIDAR ADMINISTRADOR
-===================================================== */
-
-$rolActual = strtolower(
-    trim((string) ($_SESSION['rol'] ?? ''))
-);
-
-if (
-    !in_array(
-        $rolActual,
-        ['admin', 'administrador'],
-        true
-    )
-) {
-    $_SESSION['flash'] = [
-        'type' => 'error',
-        'message' => 'No tienes permiso para registrar usuarios.'
-    ];
-
-    header('Location: ' . url('panel.php'));
-    exit;
 }
 
 /* =====================================================
@@ -174,7 +158,7 @@ if (empty($_SESSION['csrf_crear_usuario'])) {
 $datos = [
     'nombre' => '',
     'correo' => '',
-    'rol' => 'Usuario',
+    'rol' => 'Cliente',
     'estado' => 'Activo'
 ];
 
@@ -184,7 +168,7 @@ $rolesPermitidos = [
     'Administrador',
     'Medico',
     'Recepcionista',
-    'Usuario'
+    'Cliente'
 ];
 
 $estadosPermitidos = [

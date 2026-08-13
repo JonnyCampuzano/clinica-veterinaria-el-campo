@@ -897,7 +897,7 @@ try {
     if ($rolInterno === 'cliente') {
 
         login_redirigir(
-            'citas/reservar.php'
+            'reservar.php'
         );
     }
 

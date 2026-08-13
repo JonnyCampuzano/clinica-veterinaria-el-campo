@@ -12,20 +12,16 @@ require_once $raiz . '/includes/funciones.php';
 require_once $raiz . '/config/conexion.php';
 require_once $raiz . '/includes/auth.php';
 
-require_login();
+/*
+|--------------------------------------------------------------------------
+| PROTECCIÓN REAL DEL MÓDULO REPORTES
+|--------------------------------------------------------------------------
+| Todo archivo que cargue este _bootstrap.php exigirá el permiso
+| reportes.ver antes de continuar.
+|--------------------------------------------------------------------------
+*/
 
-if (function_exists('can') && !can('reportes.ver')) {
-    $rol = function_exists('current_role')
-        ? strtolower(trim((string) current_role()))
-        : strtolower(trim((string) ($_SESSION['rol'] ?? '')));
-
-    if (!in_array($rol, ['administrador', 'admin'], true)) {
-        header('Location: ' . (function_exists('url')
-            ? url('panel.php?error=sin_permiso')
-            : '../panel.php?error=sin_permiso'));
-        exit;
-    }
-}
+require_permission('reportes.ver');
 
 if (!isset($pdo) || !($pdo instanceof PDO)) {
     exit('No se encontró una conexión PDO válida. Revisa config/conexion.php.');

@@ -3,6 +3,17 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/_bootstrap.php';
 
+/*
+|--------------------------------------------------------------------------
+| PROTECCIÓN REAL DE LA URL
+|--------------------------------------------------------------------------
+| Solo los roles con permiso inventario.crear pueden registrar productos.
+|--------------------------------------------------------------------------
+*/
+
+require_permission('inventario.crear');
+
+
 $columnas = inv_columnas($pdo);
 $csrfClave = 'csrf_crear_inventario';
 $csrfToken = inv_csrf_token($csrfClave);

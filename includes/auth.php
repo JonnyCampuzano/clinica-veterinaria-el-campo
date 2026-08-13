@@ -514,20 +514,7 @@ if (!function_exists('role_permissions')) {
                 'reservas.cancelar',
 
 
-                /*
-                | Historia clínica
-                | Solo consulta
-                */
-
-                'historias.ver',
-
-
-                /*
-                | Inventario
-                | Solo consulta
-                */
-
-                'inventario.ver'
+                
             ];
         }
 
@@ -545,7 +532,7 @@ if (!function_exists('role_permissions')) {
                 'dashboard.ver',
 
                 /*
-                | Clientes
+                | Clientes - solo consultar
                 */
 
                 'clientes.ver',
@@ -577,7 +564,7 @@ if (!function_exists('role_permissions')) {
 
 
                 /*
-                | Inventario
+                | Inventario - solo consultar
                 */
 
                 'inventario.ver'

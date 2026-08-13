@@ -22,7 +22,9 @@ require_once $raiz . '/includes/auth.php';
    Solo el administrador puede acceder a Usuarios.
 ===================================================== */
 
-require_role('Administrador');
+require_permission('usuarios.ver');
+
+$puedeCrear = can('usuarios.crear');
 
 /* =====================================================
    FUNCIONES DE RESPALDO
@@ -275,12 +277,14 @@ require_once $raiz . '/includes/header.php';
         <?php endif; ?>
     </form>
 
-    <a
-        class="btn btn-primary"
-        href="<?= e(url('usuarios/crear.php')) ?>"
-    >
-        ➕ Registrar nuevo usuario
-    </a>
+    <?php if ($puedeCrear): ?>
+        <a
+            class="btn btn-primary"
+            href="<?= e(url('usuarios/crear.php')) ?>"
+        >
+            ➕ Registrar nuevo usuario
+        </a>
+    <?php endif; ?>
 
 </div>
 

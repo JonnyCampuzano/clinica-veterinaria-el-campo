@@ -3,6 +3,17 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/_bootstrap.php';
 
+/*
+|--------------------------------------------------------------------------
+| PROTECCIÓN REAL DE LA URL
+|--------------------------------------------------------------------------
+| Solo los roles con permiso inventario.editar pueden modificar productos.
+|--------------------------------------------------------------------------
+*/
+
+require_permission('inventario.editar');
+
+
 $id = $_SERVER['REQUEST_METHOD'] === 'POST'
     ? (int) ($_POST['id'] ?? 0)
     : (

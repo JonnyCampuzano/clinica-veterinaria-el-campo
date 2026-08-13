@@ -3,6 +3,20 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/_bootstrap.php';
 
+ /*
+|--------------------------------------------------------------------------
+| PROTECCIÓN REAL DEL MÓDULO
+|--------------------------------------------------------------------------
+| Solo puede entrar quien tenga permiso para ver inventario.
+|--------------------------------------------------------------------------
+*/
+require_permission('inventario.ver');
+
+$puedeCrear = can('inventario.crear');
+$puedeEditar = can('inventario.editar');
+$puedeEliminar = can('inventario.eliminar');
+
+
 $buscar = trim((string) ($_GET['buscar'] ?? ''));
 $categoriaFiltro = trim(
     (string) ($_GET['categoria'] ?? '')
@@ -219,16 +233,18 @@ require_once __DIR__ . '/_styles.php';
                 </p>
             </div>
 
-            <div class="inv-header-actions">
-                <a
-                    class="inv-btn inv-btn-primary"
-                    href="<?= inv_e(
-                        inv_url('inventario/crear.php')
-                    ) ?>"
-                >
-                    ＋ Registrar producto
-                </a>
-            </div>
+            <?php if ($puedeCrear): ?>
+                <div class="inv-header-actions">
+                    <a
+                        class="inv-btn inv-btn-primary"
+                        href="<?= inv_e(
+                            inv_url('inventario/crear.php')
+                        ) ?>"
+                    >
+                        ＋ Registrar producto
+                    </a>
+                </div>
+            <?php endif; ?>
         </header>
 
         <div class="inv-stats">
@@ -547,41 +563,45 @@ require_once __DIR__ . '/_styles.php';
                                                 👁 Ver
                                             </a>
 
-                                            <a
-                                                class="
-                                                    inv-action
-                                                    inv-action-edit
-                                                "
-                                                href="<?= inv_e(
-                                                    inv_url(
-                                                        'inventario/editar.php?id=' .
-                                                        (int) (
-                                                            $producto['id']
-                                                            ?? 0
+                                            <?php if ($puedeEditar): ?>
+                                                <a
+                                                    class="
+                                                        inv-action
+                                                        inv-action-edit
+                                                    "
+                                                    href="<?= inv_e(
+                                                        inv_url(
+                                                            'inventario/editar.php?id=' .
+                                                            (int) (
+                                                                $producto['id']
+                                                                ?? 0
+                                                            )
                                                         )
-                                                    )
-                                                ) ?>"
-                                            >
-                                                ✏️ Editar
-                                            </a>
+                                                    ) ?>"
+                                                >
+                                                    ✏️ Editar
+                                                </a>
+                                            <?php endif; ?>
 
-                                            <a
-                                                class="
-                                                    inv-action
-                                                    inv-action-delete
-                                                "
-                                                href="<?= inv_e(
-                                                    inv_url(
-                                                        'inventario/eliminar.php?id=' .
-                                                        (int) (
-                                                            $producto['id']
-                                                            ?? 0
+                                            <?php if ($puedeEliminar): ?>
+                                                <a
+                                                    class="
+                                                        inv-action
+                                                        inv-action-delete
+                                                    "
+                                                    href="<?= inv_e(
+                                                        inv_url(
+                                                            'inventario/eliminar.php?id=' .
+                                                            (int) (
+                                                                $producto['id']
+                                                                ?? 0
+                                                            )
                                                         )
-                                                    )
-                                                ) ?>"
-                                            >
-                                                🗑️ Eliminar
-                                            </a>
+                                                    ) ?>"
+                                                >
+                                                    🗑️ Eliminar
+                                                </a>
+                                            <?php endif; ?>
                                         </div>
                                     </td>
                                 </tr>
@@ -597,17 +617,21 @@ require_once __DIR__ . '/_styles.php';
                     <h2>No hay productos registrados</h2>
 
                     <p>
-                        Registra el primer producto del inventario.
+                        <?= $puedeCrear
+                            ? 'Registra el primer producto del inventario.'
+                            : 'No hay productos disponibles para consultar.' ?>
                     </p>
 
-                    <a
-                        class="inv-btn inv-btn-primary"
-                        href="<?= inv_e(
-                            inv_url('inventario/crear.php')
-                        ) ?>"
-                    >
-                        ＋ Registrar producto
-                    </a>
+                    <?php if ($puedeCrear): ?>
+                        <a
+                            class="inv-btn inv-btn-primary"
+                            href="<?= inv_e(
+                                inv_url('inventario/crear.php')
+                            ) ?>"
+                        >
+                            ＋ Registrar producto
+                        </a>
+                    <?php endif; ?>
                 </div>
             <?php endif; ?>
         </div>
