@@ -172,6 +172,28 @@ $emailIngresado = trim(
     )
 );
 
+
+/*
+|--------------------------------------------------------------------------
+| MENSAJE DE ÉXITO
+|--------------------------------------------------------------------------
+|
+| Se utiliza, por ejemplo, después de restablecer correctamente
+| la contraseña desde procesar_restablecer.php.
+|
+*/
+
+$mensajeExito = trim(
+    (string) (
+        $_SESSION['mensaje_login']
+        ?? ''
+    )
+);
+
+if ($mensajeExito !== '') {
+    unset($_SESSION['mensaje_login']);
+}
+
 ?>
 <!DOCTYPE html>
 
@@ -404,6 +426,33 @@ $emailIngresado = trim(
             color: #1f2937;
 
             margin-bottom: 32px;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | MENSAJE DE ÉXITO
+        |--------------------------------------------------------------------------
+        */
+
+        .mensaje-exito {
+
+            padding: 14px;
+
+            margin-bottom: 25px;
+
+            background: #ecfdf5;
+
+            border:
+                1px solid #a7f3d0;
+
+            border-radius: 10px;
+
+            color: #047857;
+
+            text-align: center;
+
+            font-weight: 600;
         }
 
 
@@ -767,6 +816,33 @@ $emailIngresado = trim(
 
             <!--
             |--------------------------------------------------------------------------
+            | MENSAJE DE ÉXITO
+            |--------------------------------------------------------------------------
+            -->
+
+
+            <?php if ($mensajeExito !== ''): ?>
+
+
+                <div class="mensaje-exito">
+
+
+                    <?= htmlspecialchars(
+                        $mensajeExito,
+                        ENT_QUOTES,
+                        'UTF-8'
+                    ) ?>
+
+
+                </div>
+
+
+            <?php endif; ?>
+
+
+
+            <!--
+            |--------------------------------------------------------------------------
             | MENSAJE DE ERROR
             |--------------------------------------------------------------------------
             -->
@@ -926,7 +1002,7 @@ $emailIngresado = trim(
 
                     href="<?= htmlspecialchars(
                         $rutaBase .
-                        '/recuperar_password.php',
+                        '/olvide_password.php',
                         ENT_QUOTES,
                         'UTF-8'
                     ) ?>"
@@ -934,6 +1010,7 @@ $emailIngresado = trim(
                 >
 
                     ¿Olvidaste tu contraseña?
+
 
                 </a>
 

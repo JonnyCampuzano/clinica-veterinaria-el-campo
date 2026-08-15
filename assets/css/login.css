@@ -665,3 +665,15 @@ body {
         font-size: 14px;
     }
 }
+
+
+.mensaje-exito {
+    background: #ecfdf5;
+    color: #047857;
+    border: 1px solid #a7f3d0;
+    padding: 15px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    text-align: center;
+    font-weight: 600;
+}
