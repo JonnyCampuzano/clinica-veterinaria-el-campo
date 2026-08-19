@@ -156,6 +156,8 @@ $claseActiva = static function (
                 <span class="menu-icon">🔐</span>
                 <span>Usuarios</span>
             </a>
+
+            
         <?php endif; ?>
 
     </nav>
