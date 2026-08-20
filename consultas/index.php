@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/_bootstrap.php';
+require_once dirname(__DIR__) . '/config/crypto.php';
 
 $buscar = trim((string) ($_GET['buscar'] ?? ''));
 $fecha = trim((string) ($_GET['fecha'] ?? ''));
@@ -66,6 +67,11 @@ try {
 }
 
 try {
+    /*
+     * Los datos personales del propietario están cifrados en MySQL.
+     * Por esa razón no hacemos LIKE sobre nombres, apellidos o cédula.
+     * Se consultan los registros y luego se descifran/filtran en PHP.
+     */
     $sql = '
         SELECT
             co.id,
@@ -95,38 +101,10 @@ try {
 
     $parametros = [];
 
-    if ($buscar !== '') {
-        $termino = '%' . $buscar . '%';
-
-        $sql .= '
-            AND (
-                m.nombre LIKE :buscar_mascota
-                OR m.especie LIKE :buscar_especie
-                OR m.raza LIKE :buscar_raza
-                OR c.nombres LIKE :buscar_cliente_nombres
-                OR c.apellidos LIKE :buscar_cliente_apellidos
-                OR c.cedula LIKE :buscar_cedula
-                OR co.motivo LIKE :buscar_motivo
-                OR co.diagnostico LIKE :buscar_diagnostico
-                OR co.tratamiento LIKE :buscar_tratamiento
-                OR u.nombre LIKE :buscar_usuario
-            )
-        ';
-
-        $parametros = [
-            ':buscar_mascota' => $termino,
-            ':buscar_especie' => $termino,
-            ':buscar_raza' => $termino,
-            ':buscar_cliente_nombres' => $termino,
-            ':buscar_cliente_apellidos' => $termino,
-            ':buscar_cedula' => $termino,
-            ':buscar_motivo' => $termino,
-            ':buscar_diagnostico' => $termino,
-            ':buscar_tratamiento' => $termino,
-            ':buscar_usuario' => $termino,
-        ];
-    }
-
+    /*
+     * La fecha no está cifrada, así que sí puede filtrarse directamente
+     * en MySQL.
+     */
     if ($fecha !== '') {
         $sql .= ' AND co.fecha = :fecha';
         $parametros[':fecha'] = $fecha;
@@ -137,7 +115,94 @@ try {
     $consulta = $pdo->prepare($sql);
     $consulta->execute($parametros);
 
-    $historias = $consulta->fetchAll(PDO::FETCH_ASSOC);
+    $filasHistorias = $consulta->fetchAll(PDO::FETCH_ASSOC);
+    $historias = [];
+
+    foreach ($filasHistorias as $historia) {
+        try {
+            /*
+             * Descifrar únicamente los datos personales del propietario.
+             */
+            $historia['cliente_nombres'] = decrypt_personal(
+                $historia['cliente_nombres'] ?? null
+            );
+
+            $historia['cliente_apellidos'] = decrypt_personal(
+                $historia['cliente_apellidos'] ?? null
+            );
+
+            $historia['cliente_cedula'] = decrypt_personal(
+                $historia['cliente_cedula'] ?? null
+            );
+        } catch (Throwable $errorDescifrado) {
+            error_log(
+                'Error al descifrar propietario de historia clínica ID ' .
+                (int) ($historia['id'] ?? 0) .
+                ': ' .
+                $errorDescifrado->getMessage()
+            );
+
+            /*
+             * Nunca mostramos el ciphertext enc:v1: al usuario.
+             */
+            $historia['cliente_nombres'] = 'Dato protegido';
+            $historia['cliente_apellidos'] = '';
+            $historia['cliente_cedula'] = '';
+        }
+
+        /*
+         * Búsqueda después del descifrado.
+         * Permite buscar por mascota, propietario, cédula,
+         * motivo, diagnóstico, tratamiento y veterinario.
+         */
+        if ($buscar !== '') {
+            $propietarioBusqueda = trim(
+                (string) ($historia['cliente_nombres'] ?? '') .
+                ' ' .
+                (string) ($historia['cliente_apellidos'] ?? '')
+            );
+
+            $camposBusqueda = [
+                $historia['mascota_nombre'] ?? '',
+                $historia['mascota_especie'] ?? '',
+                $historia['mascota_raza'] ?? '',
+                $historia['cliente_nombres'] ?? '',
+                $historia['cliente_apellidos'] ?? '',
+                $propietarioBusqueda,
+                $historia['cliente_cedula'] ?? '',
+                $historia['motivo'] ?? '',
+                $historia['diagnostico'] ?? '',
+                $historia['tratamiento'] ?? '',
+                $historia['usuario_nombre'] ?? '',
+            ];
+
+            $coincide = false;
+
+            foreach ($camposBusqueda as $campo) {
+                $campoTexto = (string) $campo;
+
+                if (
+                    function_exists('mb_stripos')
+                        ? mb_stripos(
+                            $campoTexto,
+                            $buscar,
+                            0,
+                            'UTF-8'
+                        ) !== false
+                        : stripos($campoTexto, $buscar) !== false
+                ) {
+                    $coincide = true;
+                    break;
+                }
+            }
+
+            if (!$coincide) {
+                continue;
+            }
+        }
+
+        $historias[] = $historia;
+    }
 } catch (Throwable $error) {
     error_log(
         'Error cargando historias clínicas: ' .
@@ -146,7 +211,7 @@ try {
 
     $mensajeError =
         'No se pudieron cargar las historias clínicas. ' .
-        'Revisa la tabla consultas y sus relaciones.';
+        'Revisa la tabla historias_clinicas, las relaciones y la clave de cifrado.';
 }
 
 $pageTitle = 'Historias clínicas';

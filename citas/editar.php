@@ -28,6 +28,7 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
 require_once $raiz . '/config/app.php';
 require_once $raiz . '/includes/funciones.php';
 require_once $raiz . '/config/conexion.php';
+require_once $raiz . '/config/crypto.php';
 require_once $raiz . '/includes/auth.php';
 
 /*
@@ -155,14 +156,73 @@ try {
          FROM mascotas m
          INNER JOIN clientes c
             ON c.id = m.cliente_id
-         ORDER BY
-            c.nombres ASC,
-            c.apellidos ASC,
-            m.nombre ASC'
+         ORDER BY m.nombre ASC'
     );
 
-    $mascotas = $consultaMascotas->fetchAll(
+    $mascotasCifradas = $consultaMascotas->fetchAll(
         PDO::FETCH_ASSOC
+    );
+
+    $mascotas = [];
+
+    foreach ($mascotasCifradas as $mascota) {
+        try {
+            $mascota['cliente_nombres'] = decrypt_personal(
+                $mascota['cliente_nombres'] ?? null
+            );
+
+            $mascota['cliente_apellidos'] = decrypt_personal(
+                $mascota['cliente_apellidos'] ?? null
+            );
+
+            $mascota['cliente_cedula'] = decrypt_personal(
+                $mascota['cliente_cedula'] ?? null
+            );
+
+            $mascotas[] = $mascota;
+        } catch (Throwable $errorDescifrado) {
+            error_log(
+                'Error al descifrar propietario de mascota ID ' .
+                (int) ($mascota['id'] ?? 0) .
+                ' al editar cita: ' .
+                $errorDescifrado->getMessage()
+            );
+        }
+    }
+
+    /*
+     * Los datos personales están cifrados en MySQL.
+     * El orden alfabético se realiza después de descifrarlos.
+     */
+    usort(
+        $mascotas,
+        static function (array $a, array $b): int {
+            $propietarioA = trim(
+                (string) ($a['cliente_nombres'] ?? '') .
+                ' ' .
+                (string) ($a['cliente_apellidos'] ?? '')
+            );
+
+            $propietarioB = trim(
+                (string) ($b['cliente_nombres'] ?? '') .
+                ' ' .
+                (string) ($b['cliente_apellidos'] ?? '')
+            );
+
+            $comparacion = strcasecmp(
+                $propietarioA,
+                $propietarioB
+            );
+
+            if ($comparacion !== 0) {
+                return $comparacion;
+            }
+
+            return strcasecmp(
+                (string) ($a['mascota'] ?? ''),
+                (string) ($b['mascota'] ?? '')
+            );
+        }
     );
 } catch (Throwable $error) {
     error_log(
@@ -172,7 +232,7 @@ try {
 
     $errores[] =
         'No se pudieron cargar las mascotas. ' .
-        'Revisa las tablas mascotas y clientes.';
+        'Revisa las tablas mascotas, clientes y la clave de cifrado.';
 }
 
 /*

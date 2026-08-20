@@ -22,6 +22,7 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
 require_once $raiz . '/config/app.php';
 require_once $raiz . '/includes/funciones.php';
 require_once $raiz . '/config/conexion.php';
+require_once $raiz . '/config/crypto.php';
 require_once $raiz . '/includes/auth.php';
 
 /* =====================================================
@@ -431,6 +432,8 @@ try {
 
 /* =====================================================
    CONSULTAR CITAS
+   Los datos personales del propietario están cifrados.
+   Se descifran en PHP antes de mostrarlos y buscarlos.
 ===================================================== */
 
 try {
@@ -463,40 +466,16 @@ try {
             ON cl.id = m.cliente_id
     ';
 
-    $condiciones = [];
     $parametros = [];
 
-    if ($buscar !== '') {
-        $condiciones[] = '
-            (
-                m.nombre LIKE :buscar_mascota
-                OR m.especie LIKE :buscar_especie
-                OR COALESCE(m.raza, \'\') LIKE :buscar_raza
-                OR COALESCE(cl.nombres, \'\') LIKE :buscar_nombres
-                OR COALESCE(cl.apellidos, \'\') LIKE :buscar_apellidos
-                OR COALESCE(cl.cedula, \'\') LIKE :buscar_cedula
-                OR COALESCE(ci.motivo, \'\') LIKE :buscar_motivo
-            )
-        ';
-
-        $termino = '%' . $buscar . '%';
-
-        $parametros[':buscar_mascota'] = $termino;
-        $parametros[':buscar_especie'] = $termino;
-        $parametros[':buscar_raza'] = $termino;
-        $parametros[':buscar_nombres'] = $termino;
-        $parametros[':buscar_apellidos'] = $termino;
-        $parametros[':buscar_cedula'] = $termino;
-        $parametros[':buscar_motivo'] = $termino;
-    }
-
+    /*
+     * El estado NO está cifrado, así que puede filtrarse en MySQL.
+     * Los nombres y cédula sí están cifrados, por eso NO se usa
+     * LIKE sobre ellos.
+     */
     if ($estadoFiltro !== '') {
-        $condiciones[] = 'ci.estado = :estado';
+        $sql .= ' WHERE ci.estado = :estado';
         $parametros[':estado'] = $estadoFiltro;
-    }
-
-    if ($condiciones !== []) {
-        $sql .= ' WHERE ' . implode(' AND ', $condiciones);
     }
 
     $sql .= '
@@ -513,7 +492,97 @@ try {
     $consulta = $pdo->prepare($sql);
     $consulta->execute($parametros);
 
-    $citas = $consulta->fetchAll(PDO::FETCH_ASSOC);
+    $filasCitas = $consulta->fetchAll(PDO::FETCH_ASSOC);
+    $citas = [];
+
+    foreach ($filasCitas as $fila) {
+        /*
+         * Descifrar únicamente los datos personales del propietario.
+         * Los datos de la mascota y de la cita permanecen como están.
+         */
+        try {
+            $fila['cliente_nombres'] = decrypt_personal(
+                $fila['cliente_nombres'] ?? null
+            );
+
+            $fila['cliente_apellidos'] = decrypt_personal(
+                $fila['cliente_apellidos'] ?? null
+            );
+
+            $fila['cliente_cedula'] = decrypt_personal(
+                $fila['cliente_cedula'] ?? null
+            );
+
+            $fila['cliente_telefono'] = decrypt_personal(
+                $fila['cliente_telefono'] ?? null
+            );
+        } catch (Throwable $errorDescifrado) {
+            error_log(
+                'Error al descifrar propietario de la cita ID ' .
+                (int) ($fila['id'] ?? 0) .
+                ': ' .
+                $errorDescifrado->getMessage()
+            );
+
+            /*
+             * No mostramos el texto cifrado al usuario si ocurre
+             * un problema con la clave.
+             */
+            $fila['cliente_nombres'] = 'Dato protegido';
+            $fila['cliente_apellidos'] = '';
+            $fila['cliente_cedula'] = '';
+            $fila['cliente_telefono'] = '';
+        }
+
+        /*
+         * Búsqueda después de descifrar.
+         * Así vuelve a funcionar buscar por propietario y cédula.
+         */
+        if ($buscar !== '') {
+            $propietarioBusqueda = trim(
+                (string) ($fila['cliente_nombres'] ?? '') .
+                ' ' .
+                (string) ($fila['cliente_apellidos'] ?? '')
+            );
+
+            $camposBusqueda = [
+                $fila['mascota_nombre'] ?? '',
+                $fila['mascota_especie'] ?? '',
+                $fila['mascota_raza'] ?? '',
+                $fila['cliente_nombres'] ?? '',
+                $fila['cliente_apellidos'] ?? '',
+                $propietarioBusqueda,
+                $fila['cliente_cedula'] ?? '',
+                $fila['motivo'] ?? '',
+            ];
+
+            $coincide = false;
+
+            foreach ($camposBusqueda as $campo) {
+                $campoTexto = (string) $campo;
+
+                if (
+                    function_exists('mb_stripos')
+                        ? mb_stripos(
+                            $campoTexto,
+                            $buscar,
+                            0,
+                            'UTF-8'
+                        ) !== false
+                        : stripos($campoTexto, $buscar) !== false
+                ) {
+                    $coincide = true;
+                    break;
+                }
+            }
+
+            if (!$coincide) {
+                continue;
+            }
+        }
+
+        $citas[] = $fila;
+    }
 } catch (Throwable $error) {
     error_log(
         'Error al consultar citas: ' .
@@ -522,8 +591,7 @@ try {
 
     $mensajeError =
         'No se pudieron cargar las citas. ' .
-        'Error: ' .
-        $error->getMessage();
+        'Revisa la conexión y la configuración de cifrado.';
 }
 
 /* =====================================================
@@ -543,41 +611,65 @@ try {
 
     if ($tablaReservasDisponible) {
         $sqlSolicitudes = '
-    SELECT
-        rc.id,
-        rc.usuario_id,
-        u.nombre AS nombre_cliente,
-        u.email AS correo_cliente,
-        rc.nombre_mascota,
-        rc.especie,
-        rc.fecha,
-        rc.hora,
-        rc.motivo,
-        rc.estado,
-        rc.fecha_registro
-    FROM reservas_citas rc
-    LEFT JOIN usuarios u
-        ON u.id = rc.usuario_id
-    ORDER BY
-        CASE
-            WHEN rc.estado = "Pendiente" THEN 0
-            WHEN rc.estado = "Confirmada" THEN 1
-            ELSE 2
-        END,
-        CASE
-            WHEN rc.fecha >= CURDATE() THEN 0
-            ELSE 1
-        END,
-        rc.fecha ASC,
-        rc.hora ASC,
-        rc.id DESC
-';
+            SELECT
+                id,
+                usuario_id,
+                nombre_cliente,
+                correo_cliente,
+                nombre_mascota,
+                especie,
+                fecha,
+                hora,
+                motivo,
+                estado,
+                fecha_registro
+            FROM reservas_citas
+            ORDER BY
+                CASE
+                    WHEN estado = "Pendiente" THEN 0
+                    WHEN estado = "Confirmada" THEN 1
+                    ELSE 2
+                END,
+                CASE
+                    WHEN fecha >= CURDATE() THEN 0
+                    ELSE 1
+                END,
+                fecha ASC,
+                hora ASC,
+                id DESC
+        ';
 
         $consultaSolicitudes = $pdo->query($sqlSolicitudes);
 
-        $solicitudesClientes = $consultaSolicitudes->fetchAll(
+        $solicitudesCifradas = $consultaSolicitudes->fetchAll(
             PDO::FETCH_ASSOC
         );
+
+        $solicitudesClientes = [];
+
+        foreach ($solicitudesCifradas as $reserva) {
+            try {
+                $reserva['nombre_cliente'] = decrypt_personal(
+                    $reserva['nombre_cliente'] ?? null
+                );
+
+                $reserva['correo_cliente'] = decrypt_personal(
+                    $reserva['correo_cliente'] ?? null
+                );
+            } catch (Throwable $errorDescifrado) {
+                error_log(
+                    'Error al descifrar reserva web ID ' .
+                    (int) ($reserva['id'] ?? 0) .
+                    ': ' .
+                    $errorDescifrado->getMessage()
+                );
+
+                $reserva['nombre_cliente'] = 'Dato protegido';
+                $reserva['correo_cliente'] = '';
+            }
+
+            $solicitudesClientes[] = $reserva;
+        }
     }
 } catch (Throwable $error) {
     error_log(

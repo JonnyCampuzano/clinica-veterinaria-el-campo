@@ -6,6 +6,7 @@ $raiz = dirname(__DIR__);
 require_once $raiz . '/config/app.php';
 require_once $raiz . '/includes/funciones.php';
 require_once $raiz . '/config/conexion.php';
+require_once $raiz . '/config/crypto.php';
 require_once $raiz . '/includes/auth.php';
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
@@ -76,14 +77,68 @@ try {
             apellidos,
             cedula
          FROM clientes
-         ORDER BY nombres ASC, apellidos ASC'
+         ORDER BY id ASC'
     );
 
-    $clientes = $consultaClientes->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
+    $clientesCifrados = $consultaClientes->fetchAll(
+        PDO::FETCH_ASSOC
+    );
+
+    $clientes = [];
+
+    foreach ($clientesCifrados as $cliente) {
+        try {
+            $cliente['nombres'] = decrypt_personal(
+                $cliente['nombres'] ?? null
+            );
+
+            $cliente['apellidos'] = decrypt_personal(
+                $cliente['apellidos'] ?? null
+            );
+
+            $cliente['cedula'] = decrypt_personal(
+                $cliente['cedula'] ?? null
+            );
+
+            $clientes[] = $cliente;
+        } catch (Throwable $errorDescifrado) {
+            error_log(
+                'Error al descifrar cliente ID ' .
+                (int) ($cliente['id'] ?? 0) .
+                ' al registrar mascota: ' .
+                $errorDescifrado->getMessage()
+            );
+        }
+    }
+
+    /*
+     * Los nombres están cifrados en MySQL, así que el orden
+     * alfabético debe hacerse después de descifrarlos.
+     */
+    usort(
+        $clientes,
+        static function (array $a, array $b): int {
+            $nombreA = trim(
+                (string) ($a['nombres'] ?? '') .
+                ' ' .
+                (string) ($a['apellidos'] ?? '')
+            );
+
+            $nombreB = trim(
+                (string) ($b['nombres'] ?? '') .
+                ' ' .
+                (string) ($b['apellidos'] ?? '')
+            );
+
+            return strcasecmp($nombreA, $nombreB);
+        }
+    );
+} catch (Throwable $e) {
     error_log('Error cargando clientes: ' . $e->getMessage());
     $clientes = [];
-    $errores[] = 'No se pudieron cargar los clientes registrados.';
+    $errores[] =
+        'No se pudieron cargar los clientes registrados. ' .
+        'Revisa la clave de cifrado y la conexión.';
 }
 
 /*

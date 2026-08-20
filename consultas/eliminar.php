@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/_bootstrap.php';
+require_once dirname(__DIR__) . '/config/crypto.php';
 
 $id = $_SERVER['REQUEST_METHOD'] === 'POST'
     ? ((int) ($_POST['id'] ?? 0))
@@ -54,6 +55,30 @@ if (!is_array($historia)) {
     );
 
     hc_redirigir('consultas/index.php');
+}
+
+/* =====================================================
+   DESCIFRAR DATOS DEL PROPIETARIO
+===================================================== */
+
+try {
+    $historia['cliente_nombres'] = decrypt_personal(
+        $historia['cliente_nombres'] ?? null
+    );
+
+    $historia['cliente_apellidos'] = decrypt_personal(
+        $historia['cliente_apellidos'] ?? null
+    );
+} catch (Throwable $errorDescifrado) {
+    error_log(
+        'Error descifrando propietario al eliminar historia clínica ID ' .
+        $id .
+        ': ' .
+        $errorDescifrado->getMessage()
+    );
+
+    $historia['cliente_nombres'] = 'Dato protegido';
+    $historia['cliente_apellidos'] = '';
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {

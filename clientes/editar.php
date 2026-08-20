@@ -1,260 +1,150 @@
 <?php
 declare(strict_types=1);
 
+/* =====================================================
+   RUTA PRINCIPAL
+===================================================== */
+
 $raiz = dirname(__DIR__);
+
+/* =====================================================
+   CARGAR ARCHIVOS DEL SISTEMA
+===================================================== */
+
+require_once $raiz . '/config/app.php';
+require_once $raiz . '/includes/funciones.php';
+require_once $raiz . '/config/conexion.php';
+require_once $raiz . '/config/crypto.php';
+require_once $raiz . '/includes/auth.php';
+
+/* =====================================================
+   INICIAR SESIÓN
+===================================================== */
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
 }
 
-require_once $raiz . '/config/app.php';
-require_once $raiz . '/includes/funciones.php';
-require_once $raiz . '/config/conexion.php';
-require_once $raiz . '/includes/auth.php';
+/* =====================================================
+   PROTEGER LA PÁGINA
+===================================================== */
 
-require_login();
-
-if (!isset($pdo) || !($pdo instanceof PDO)) {
-    exit('No se encontró una conexión PDO válida.');
-}
-
-if (empty($_SESSION['csrf_editar_cliente'])) {
-    $_SESSION['csrf_editar_cliente'] = bin2hex(random_bytes(32));
-}
-
-$idCliente = filter_input(
-    INPUT_GET,
-    'id',
-    FILTER_VALIDATE_INT
-);
-
-if (
-    $_SERVER['REQUEST_METHOD'] === 'POST'
+if (function_exists('require_login')) {
+    require_login();
+} elseif (
+    empty($_SESSION['usuario_id']) &&
+    empty($_SESSION['id_usuario']) &&
+    empty($_SESSION['usuario'])
 ) {
-    $idCliente = filter_input(
-        INPUT_POST,
-        'id',
-        FILTER_VALIDATE_INT
-    );
-}
+    if (function_exists('redirect')) {
+        redirect('login.php');
+    }
 
-if (!$idCliente || $idCliente <= 0) {
-    $_SESSION['flash'] = [
-        'type' => 'error',
-        'message' => 'El cliente solicitado no existe.'
-    ];
-
-    header(
-        'Location: ' .
-        url('clientes/index.php')
-    );
-
+    header('Location: ../login.php');
     exit;
 }
 
-$mensajeError = '';
+/* =====================================================
+   VALIDAR CONEXIÓN
+===================================================== */
+
+if (!isset($pdo) || !($pdo instanceof PDO)) {
+    exit('Error: config/conexion.php debe crear una conexión PDO llamada $pdo.');
+}
+
+$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+/* =====================================================
+   FUNCIONES AUXILIARES
+===================================================== */
+
+function clienteEditarEscapar(mixed $valor): string
+{
+    return htmlspecialchars(
+        (string) $valor,
+        ENT_QUOTES,
+        'UTF-8'
+    );
+}
+
+function clienteEditarUrl(string $ruta): string
+{
+    if (function_exists('url')) {
+        return url($ruta);
+    }
+
+    return '../' . ltrim($ruta, '/');
+}
+
+/* =====================================================
+   CARGAR CLIENTE
+===================================================== */
+
+$id = (int) ($_GET['id'] ?? $_POST['id'] ?? 0);
+
+if ($id <= 0) {
+    header('Location: ' . clienteEditarUrl('clientes/index.php?error=id_invalido'));
+    exit;
+}
+
+$cliente = null;
+$mensajeError = trim((string) ($_GET['error'] ?? ''));
 
 try {
-    $consulta = $pdo->prepare(
+    $stmt = $pdo->prepare(
         'SELECT
             id,
             nombres,
             apellidos,
             cedula,
             telefono,
-            email
+            email,
+            direccion
          FROM clientes
          WHERE id = :id
          LIMIT 1'
     );
 
-    $consulta->execute([
-        'id' => $idCliente
+    $stmt->execute([
+        ':id' => $id,
     ]);
 
-    $cliente = $consulta->fetch();
+    $fila = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if (!$cliente) {
-        $_SESSION['flash'] = [
-            'type' => 'error',
-            'message' => 'El cliente solicitado no existe.'
-        ];
-
-        header(
-            'Location: ' .
-            url('clientes/index.php')
-        );
-
+    if (!is_array($fila)) {
+        header('Location: ' . clienteEditarUrl('clientes/index.php?error=no_encontrado'));
         exit;
     }
+
+    $cliente = [
+        'id' => (int) ($fila['id'] ?? 0),
+        'nombres' => decrypt_personal($fila['nombres'] ?? null),
+        'apellidos' => decrypt_personal($fila['apellidos'] ?? null),
+        'cedula' => decrypt_personal($fila['cedula'] ?? null),
+        'telefono' => decrypt_personal($fila['telefono'] ?? null),
+        'email' => decrypt_personal($fila['email'] ?? null),
+        'direccion' => decrypt_personal($fila['direccion'] ?? null),
+    ];
 } catch (Throwable $error) {
-    error_log(
-        'Error al consultar cliente: ' .
-        $error->getMessage()
-    );
-
-    $_SESSION['flash'] = [
-        'type' => 'error',
-        'message' => 'No se pudo consultar el cliente.'
-    ];
-
-    header(
-        'Location: ' .
-        url('clientes/index.php')
-    );
-
-    exit;
+    error_log('Error cargando cliente para editar: ' . $error->getMessage());
+    $mensajeError = 'No se pudo cargar la información del cliente.';
 }
 
-$datos = [
-    'nombres' => (string) $cliente['nombres'],
-    'apellidos' => (string) $cliente['apellidos'],
-    'cedula' => (string) $cliente['cedula'],
-    'telefono' => (string) $cliente['telefono'],
-    'email' => (string) $cliente['email']
-];
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $datos = [
-        'nombres' => trim(
-            (string) ($_POST['nombres'] ?? '')
-        ),
-
-        'apellidos' => trim(
-            (string) ($_POST['apellidos'] ?? '')
-        ),
-
-        'cedula' => trim(
-            (string) ($_POST['cedula'] ?? '')
-        ),
-
-        'telefono' => trim(
-            (string) ($_POST['telefono'] ?? '')
-        ),
-
-        'email' => trim(
-            (string) ($_POST['email'] ?? '')
-        )
+if (!is_array($cliente)) {
+    $cliente = [
+        'id' => $id,
+        'nombres' => '',
+        'apellidos' => '',
+        'cedula' => '',
+        'telefono' => '',
+        'email' => '',
+        'direccion' => '',
     ];
-
-    $tokenFormulario = (string) (
-        $_POST['csrf_token'] ?? ''
-    );
-
-    $tokenSesion = (string) (
-        $_SESSION['csrf_editar_cliente'] ?? ''
-    );
-
-    if (
-        $tokenFormulario === '' ||
-        $tokenSesion === '' ||
-        !hash_equals(
-            $tokenSesion,
-            $tokenFormulario
-        )
-    ) {
-        $mensajeError =
-            'La sesión del formulario expiró. Recarga la página.';
-    } elseif (
-        $datos['nombres'] === '' ||
-        $datos['apellidos'] === '' ||
-        $datos['cedula'] === '' ||
-        $datos['telefono'] === '' ||
-        $datos['email'] === ''
-    ) {
-        $mensajeError =
-            'Todos los campos son obligatorios.';
-    } elseif (
-        !preg_match(
-            '/^[0-9]{10}$/',
-            $datos['cedula']
-        )
-    ) {
-        $mensajeError =
-            'La cédula debe contener exactamente 10 números.';
-    } elseif (
-        !preg_match(
-            '/^[0-9]{10}$/',
-            $datos['telefono']
-        )
-    ) {
-        $mensajeError =
-            'El teléfono debe contener exactamente 10 números.';
-    } elseif (
-        !filter_var(
-            $datos['email'],
-            FILTER_VALIDATE_EMAIL
-        )
-    ) {
-        $mensajeError =
-            'El correo electrónico no es válido.';
-    } else {
-        try {
-            $verificar = $pdo->prepare(
-                'SELECT id
-                 FROM clientes
-                 WHERE
-                    (cedula = :cedula OR email = :email)
-                    AND id <> :id
-                 LIMIT 1'
-            );
-
-            $verificar->execute([
-                'cedula' => $datos['cedula'],
-                'email' => $datos['email'],
-                'id' => $idCliente
-            ]);
-
-            if ($verificar->fetch()) {
-                $mensajeError =
-                    'La cédula o el correo pertenecen a otro cliente.';
-            } else {
-                $actualizar = $pdo->prepare(
-                    'UPDATE clientes
-                     SET
-                        nombres = :nombres,
-                        apellidos = :apellidos,
-                        cedula = :cedula,
-                        telefono = :telefono,
-                        email = :email
-                     WHERE id = :id'
-                );
-
-                $actualizar->execute([
-                    'nombres' => $datos['nombres'],
-                    'apellidos' => $datos['apellidos'],
-                    'cedula' => $datos['cedula'],
-                    'telefono' => $datos['telefono'],
-                    'email' => $datos['email'],
-                    'id' => $idCliente
-                ]);
-
-                $_SESSION['csrf_editar_cliente'] =
-                    bin2hex(random_bytes(32));
-
-                $_SESSION['flash'] = [
-                    'type' => 'success',
-                    'message' => 'Cliente actualizado correctamente.'
-                ];
-
-                header(
-                    'Location: ' .
-                    url('clientes/index.php')
-                );
-
-                exit;
-            }
-        } catch (Throwable $error) {
-            error_log(
-                'Error al actualizar cliente: ' .
-                $error->getMessage()
-            );
-
-            $mensajeError =
-                'No se pudo actualizar el cliente.';
-        }
-    }
 }
+
+/* =====================================================
+   ENCABEZADO
+===================================================== */
 
 $pageTitle = 'Editar cliente';
 $activePage = 'clientes';
@@ -263,272 +153,439 @@ require_once $raiz . '/includes/header.php';
 ?>
 
 <style>
-    .cliente-form-container {
-        display: flex;
-        justify-content: center;
-        padding: 10px 0 40px;
+    .cliente-edit-page {
+        width: min(980px, 100%);
+        margin: 0 auto;
+        padding-bottom: 42px;
     }
 
-    .cliente-form-card {
-        width: min(850px, 100%);
+    .cliente-edit-panel {
         overflow: hidden;
-        background: #ffffff;
-        border: 1px solid #dce5f0;
+        border: 1px solid #dbe5f0;
         border-radius: 18px;
-        box-shadow: 0 14px 35px rgba(15, 35, 65, 0.09);
+        background: #ffffff;
+        box-shadow: 0 14px 38px rgba(15, 35, 65, 0.08);
     }
 
-    .cliente-form-header {
+    .cliente-edit-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
         padding: 24px 28px;
         border-bottom: 1px solid #e2e8f0;
+        background: linear-gradient(135deg, #ffffff, #f7fbff);
     }
 
-    .cliente-form-header h2 {
+    .cliente-edit-title {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+    }
+
+    .cliente-edit-icon {
+        display: grid;
+        width: 48px;
+        height: 48px;
+        flex: 0 0 48px;
+        place-items: center;
+        border-radius: 14px;
+        background: #e0ecff;
+        font-size: 23px;
+    }
+
+    .cliente-edit-header h1 {
         margin: 0 0 6px;
-        color: #06234a;
+        color: #08264f;
+        font-size: 25px;
     }
 
-    .cliente-form-header p {
+    .cliente-edit-header p {
         margin: 0;
         color: #64748b;
+        font-size: 14px;
     }
 
-    .cliente-form {
+    .cliente-edit-back {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 40px;
+        padding: 9px 14px;
+        border-radius: 10px;
+        background: #eef2f7;
+        color: #334155;
+        font-size: 13px;
+        font-weight: 800;
+        text-decoration: none;
+        transition: .2s ease;
+    }
+
+    .cliente-edit-back:hover {
+        background: #e2e8f0;
+    }
+
+    .cliente-edit-body {
         padding: 28px;
     }
 
-    .cliente-grid {
+    .cliente-edit-alert {
+        margin-bottom: 22px;
+        padding: 13px 16px;
+        border: 1px solid #fecaca;
+        border-radius: 11px;
+        background: #fff1f2;
+        color: #b91c1c;
+        font-size: 14px;
+        font-weight: 700;
+    }
+
+    .cliente-edit-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 20px;
     }
 
-    .cliente-group {
+    .cliente-edit-group {
         display: flex;
         flex-direction: column;
         gap: 8px;
     }
 
-    .cliente-group-full {
+    .cliente-edit-group-full {
         grid-column: 1 / -1;
     }
 
-    .cliente-group label {
-        color: #334155;
-        font-weight: 700;
+    .cliente-edit-group label {
+        color: #1e293b;
+        font-size: 13px;
+        font-weight: 800;
     }
 
-    .cliente-group input {
+    .cliente-edit-group label span {
+        color: #dc2626;
+    }
+
+    .cliente-edit-control {
         width: 100%;
-        padding: 12px 14px;
+        box-sizing: border-box;
+        min-height: 44px;
+        padding: 11px 13px;
         border: 1px solid #cbd5e1;
         border-radius: 10px;
+        background: #ffffff;
+        color: #0f172a;
         font: inherit;
+        font-size: 14px;
         outline: none;
+        transition: border-color .2s ease, box-shadow .2s ease;
     }
 
-    .cliente-group input:focus {
+    .cliente-edit-control:focus {
         border-color: #2563eb;
-        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.13);
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
     }
 
-    .cliente-form-actions {
+    textarea.cliente-edit-control {
+        min-height: 105px;
+        resize: vertical;
+    }
+
+    .cliente-edit-help {
+        color: #94a3b8;
+        font-size: 12px;
+        line-height: 1.4;
+    }
+
+    .cliente-edit-security {
         display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        margin-top: 24px;
+        padding: 14px 16px;
+        border: 1px solid #bfdbfe;
+        border-radius: 12px;
+        background: #eff6ff;
+        color: #1e40af;
+        font-size: 13px;
+        line-height: 1.5;
+    }
+
+    .cliente-edit-security strong {
+        color: #1e3a8a;
+    }
+
+    .cliente-edit-actions {
+        display: flex;
+        align-items: center;
         justify-content: flex-end;
-        gap: 12px;
+        gap: 10px;
         margin-top: 28px;
         padding-top: 22px;
-        border-top: 1px solid #e2e8f0;
+        border-top: 1px solid #e8eef5;
     }
 
-    .cliente-form-button {
+    .cliente-edit-btn {
         display: inline-flex;
-        justify-content: center;
         align-items: center;
-        min-height: 43px;
-        padding: 10px 18px;
+        justify-content: center;
+        min-height: 42px;
+        padding: 10px 17px;
         border: 0;
         border-radius: 10px;
         font: inherit;
-        font-weight: 700;
+        font-size: 14px;
+        font-weight: 800;
         text-decoration: none;
         cursor: pointer;
+        transition: .2s ease;
     }
 
-    .cliente-button-cancel {
-        background: #e9eef5;
+    .cliente-edit-btn-cancel {
+        background: #eef2f7;
         color: #334155;
     }
 
-    .cliente-button-save {
-        background: #c47b13;
+    .cliente-edit-btn-cancel:hover {
+        background: #e2e8f0;
+    }
+
+    .cliente-edit-btn-save {
+        background: #2563eb;
         color: #ffffff;
+        box-shadow: 0 8px 18px rgba(37, 99, 235, 0.22);
     }
 
-    .cliente-error {
-        margin: 22px 28px 0;
-        padding: 13px 16px;
-        border: 1px solid #fecaca;
-        border-radius: 10px;
-        background: #fff1f2;
-        color: #b91c1c;
-        font-weight: 700;
+    .cliente-edit-btn-save:hover {
+        background: #1d4ed8;
+        transform: translateY(-1px);
     }
 
-    @media (max-width: 700px) {
-        .cliente-grid {
+    @media (max-width: 760px) {
+        .cliente-edit-header {
+            align-items: stretch;
+            flex-direction: column;
+        }
+
+        .cliente-edit-back {
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .cliente-edit-grid {
             grid-template-columns: 1fr;
         }
 
-        .cliente-group-full {
+        .cliente-edit-group-full {
             grid-column: auto;
+        }
+
+        .cliente-edit-body,
+        .cliente-edit-header {
+            padding-left: 18px;
+            padding-right: 18px;
+        }
+
+        .cliente-edit-actions {
+            align-items: stretch;
+            flex-direction: column-reverse;
+        }
+
+        .cliente-edit-btn {
+            width: 100%;
+            box-sizing: border-box;
         }
     }
 </style>
 
-<div class="cliente-form-container">
+<div class="cliente-edit-page">
+    <section class="cliente-edit-panel">
 
-    <div class="cliente-form-card">
+        <header class="cliente-edit-header">
+            <div class="cliente-edit-title">
+                <div class="cliente-edit-icon">✏️</div>
 
-        <div class="cliente-form-header">
-            <h2>Editar información del cliente</h2>
+                <div>
+                    <h1>Editar cliente</h1>
+                    <p>
+                        Actualiza la información personal y de contacto de
+                        <strong><?= clienteEditarEscapar(
+                            trim(
+                                (string) ($cliente['nombres'] ?? '') . ' ' .
+                                (string) ($cliente['apellidos'] ?? '')
+                            )
+                        ) ?></strong>.
+                    </p>
+                </div>
+            </div>
 
-            <p>
-                Modifica los datos y guarda los cambios.
-            </p>
+            <a
+                class="cliente-edit-back"
+                href="<?= clienteEditarEscapar(
+                    clienteEditarUrl('clientes/index.php')
+                ) ?>"
+            >
+                ← Volver a clientes
+            </a>
+        </header>
+
+        <div class="cliente-edit-body">
+
+            <?php if ($mensajeError !== ''): ?>
+                <div
+                    class="cliente-edit-alert"
+                    role="alert"
+                >
+                    ⚠️ <?= clienteEditarEscapar($mensajeError) ?>
+                </div>
+            <?php endif; ?>
+
+            <form
+                action="<?= clienteEditarEscapar(
+                    clienteEditarUrl('clientes/actualizar.php')
+                ) ?>"
+                method="POST"
+                autocomplete="off"
+            >
+                <input
+                    type="hidden"
+                    name="id"
+                    value="<?= (int) ($cliente['id'] ?? 0) ?>"
+                >
+
+                <div class="cliente-edit-grid">
+
+                    <div class="cliente-edit-group">
+                        <label for="nombres">
+                            Nombres <span>*</span>
+                        </label>
+
+                        <input
+                            class="cliente-edit-control"
+                            type="text"
+                            id="nombres"
+                            name="nombres"
+                            maxlength="100"
+                            value="<?= clienteEditarEscapar($cliente['nombres'] ?? '') ?>"
+                            placeholder="Ej. Juan Carlos"
+                            required
+                            autofocus
+                        >
+                    </div>
+
+                    <div class="cliente-edit-group">
+                        <label for="apellidos">
+                            Apellidos <span>*</span>
+                        </label>
+
+                        <input
+                            class="cliente-edit-control"
+                            type="text"
+                            id="apellidos"
+                            name="apellidos"
+                            maxlength="100"
+                            value="<?= clienteEditarEscapar($cliente['apellidos'] ?? '') ?>"
+                            placeholder="Ej. Pérez Gómez"
+                            required
+                        >
+                    </div>
+
+                    <div class="cliente-edit-group">
+                        <label for="cedula">Cédula</label>
+
+                        <input
+                            class="cliente-edit-control"
+                            type="text"
+                            id="cedula"
+                            name="cedula"
+                            maxlength="13"
+                            inputmode="numeric"
+                            value="<?= clienteEditarEscapar($cliente['cedula'] ?? '') ?>"
+                            placeholder="Ej. 0951234567"
+                        >
+
+                        <small class="cliente-edit-help">
+                            Ingresa únicamente números.
+                        </small>
+                    </div>
+
+                    <div class="cliente-edit-group">
+                        <label for="telefono">
+                            Teléfono <span>*</span>
+                        </label>
+
+                        <input
+                            class="cliente-edit-control"
+                            type="tel"
+                            id="telefono"
+                            name="telefono"
+                            maxlength="30"
+                            value="<?= clienteEditarEscapar($cliente['telefono'] ?? '') ?>"
+                            placeholder="Ej. 0991234567"
+                            required
+                        >
+                    </div>
+
+                    <div class="cliente-edit-group cliente-edit-group-full">
+                        <label for="email">Correo electrónico</label>
+
+                        <input
+                            class="cliente-edit-control"
+                            type="email"
+                            id="email"
+                            name="email"
+                            maxlength="150"
+                            value="<?= clienteEditarEscapar($cliente['email'] ?? '') ?>"
+                            placeholder="Ej. cliente@email.com"
+                        >
+                    </div>
+
+                    <div class="cliente-edit-group cliente-edit-group-full">
+                        <label for="direccion">Dirección</label>
+
+                        <textarea
+                            class="cliente-edit-control"
+                            id="direccion"
+                            name="direccion"
+                            maxlength="255"
+                            placeholder="Ej. Nobol, Guayas - Av. Principal..."
+                        ><?= clienteEditarEscapar($cliente['direccion'] ?? '') ?></textarea>
+                    </div>
+
+                </div>
+
+                <div class="cliente-edit-security">
+                    <span>🔐</span>
+
+                    <div>
+                        <strong>Protección de datos personales.</strong><br>
+                        Los cambios guardados en nombres, apellidos, cédula,
+                        teléfono, correo y dirección se almacenan cifrados en la base de datos.
+                    </div>
+                </div>
+
+                <div class="cliente-edit-actions">
+                    <a
+                        class="cliente-edit-btn cliente-edit-btn-cancel"
+                        href="<?= clienteEditarEscapar(
+                            clienteEditarUrl('clientes/index.php')
+                        ) ?>"
+                    >
+                        Cancelar
+                    </a>
+
+                    <button
+                        class="cliente-edit-btn cliente-edit-btn-save"
+                        type="submit"
+                    >
+                        💾 Guardar cambios
+                    </button>
+                </div>
+            </form>
+
         </div>
-
-        <?php if ($mensajeError !== ''): ?>
-            <div class="cliente-error">
-                ⚠️ <?= e($mensajeError) ?>
-            </div>
-        <?php endif; ?>
-
-        <form
-            method="POST"
-            class="cliente-form"
-            autocomplete="off"
-        >
-            <input
-                type="hidden"
-                name="id"
-                value="<?= $idCliente ?>"
-            >
-
-            <input
-                type="hidden"
-                name="csrf_token"
-                value="<?= e($_SESSION['csrf_editar_cliente']) ?>"
-            >
-
-            <div class="cliente-grid">
-
-                <div class="cliente-group">
-                    <label for="nombres">Nombres</label>
-
-                    <input
-                        type="text"
-                        id="nombres"
-                        name="nombres"
-                        maxlength="100"
-                        value="<?= e($datos['nombres']) ?>"
-                        required
-                    >
-                </div>
-
-                <div class="cliente-group">
-                    <label for="apellidos">Apellidos</label>
-
-                    <input
-                        type="text"
-                        id="apellidos"
-                        name="apellidos"
-                        maxlength="100"
-                        value="<?= e($datos['apellidos']) ?>"
-                        required
-                    >
-                </div>
-
-                <div class="cliente-group">
-                    <label for="cedula">Cédula</label>
-
-                    <input
-                        type="text"
-                        id="cedula"
-                        name="cedula"
-                        maxlength="10"
-                        inputmode="numeric"
-                        pattern="[0-9]{10}"
-                        value="<?= e($datos['cedula']) ?>"
-                        required
-                    >
-                </div>
-
-                <div class="cliente-group">
-                    <label for="telefono">Teléfono</label>
-
-                    <input
-                        type="text"
-                        id="telefono"
-                        name="telefono"
-                        maxlength="10"
-                        inputmode="numeric"
-                        pattern="[0-9]{10}"
-                        value="<?= e($datos['telefono']) ?>"
-                        required
-                    >
-                </div>
-
-                <div class="cliente-group cliente-group-full">
-                    <label for="email">Correo electrónico</label>
-
-                    <input
-                        type="email"
-                        id="email"
-                        name="email"
-                        maxlength="150"
-                        value="<?= e($datos['email']) ?>"
-                        required
-                    >
-                </div>
-
-            </div>
-
-            <div class="cliente-form-actions">
-
-                <a
-                    class="cliente-form-button cliente-button-cancel"
-                    href="<?= e(url('clientes/index.php')) ?>"
-                >
-                    Cancelar
-                </a>
-
-                <button
-                    class="cliente-form-button cliente-button-save"
-                    type="submit"
-                >
-                    💾 Guardar cambios
-                </button>
-
-            </div>
-
-        </form>
-
-    </div>
-
+    </section>
 </div>
-
-<script>
-    document
-        .querySelectorAll('#cedula, #telefono')
-        .forEach((campo) => {
-            campo.addEventListener('input', () => {
-                campo.value = campo.value
-                    .replace(/\D/g, '')
-                    .slice(0, 10);
-            });
-        });
-</script>
 
 <?php
 require_once $raiz . '/includes/footer.php';

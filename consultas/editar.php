@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/_bootstrap.php';
+require_once dirname(__DIR__) . '/config/crypto.php';
 
 $id = $_SERVER['REQUEST_METHOD'] === 'POST'
     ? ((int) ($_POST['id'] ?? 0))
@@ -32,13 +33,74 @@ try {
          FROM mascotas m
          INNER JOIN clientes c
             ON c.id = m.cliente_id
-         ORDER BY
-            c.nombres ASC,
-            c.apellidos ASC,
-            m.nombre ASC'
+         ORDER BY m.nombre ASC'
     );
 
-    $mascotas = $consultaMascotas->fetchAll(PDO::FETCH_ASSOC);
+    $mascotasCifradas = $consultaMascotas->fetchAll(
+        PDO::FETCH_ASSOC
+    );
+
+    $mascotas = [];
+
+    foreach ($mascotasCifradas as $mascota) {
+        try {
+            $mascota['cliente_nombres'] = decrypt_personal(
+                $mascota['cliente_nombres'] ?? null
+            );
+
+            $mascota['cliente_apellidos'] = decrypt_personal(
+                $mascota['cliente_apellidos'] ?? null
+            );
+
+            $mascota['cliente_cedula'] = decrypt_personal(
+                $mascota['cliente_cedula'] ?? null
+            );
+
+            $mascotas[] = $mascota;
+        } catch (Throwable $errorDescifrado) {
+            error_log(
+                'Error descifrando propietario de mascota ID ' .
+                (int) ($mascota['id'] ?? 0) .
+                ' al editar historia clínica: ' .
+                $errorDescifrado->getMessage()
+            );
+        }
+    }
+
+    /*
+     * Como los nombres están cifrados en MySQL,
+     * el orden se realiza después de descifrarlos.
+     */
+    usort(
+        $mascotas,
+        static function (array $a, array $b): int {
+            $propietarioA = trim(
+                (string) ($a['cliente_nombres'] ?? '') .
+                ' ' .
+                (string) ($a['cliente_apellidos'] ?? '')
+            );
+
+            $propietarioB = trim(
+                (string) ($b['cliente_nombres'] ?? '') .
+                ' ' .
+                (string) ($b['cliente_apellidos'] ?? '')
+            );
+
+            $comparacion = strcasecmp(
+                $propietarioA,
+                $propietarioB
+            );
+
+            if ($comparacion !== 0) {
+                return $comparacion;
+            }
+
+            return strcasecmp(
+                (string) ($a['mascota'] ?? ''),
+                (string) ($b['mascota'] ?? '')
+            );
+        }
+    );
 } catch (Throwable $error) {
     error_log(
         'Error cargando mascotas para editar historia: ' .
@@ -46,7 +108,8 @@ try {
     );
 
     $errores[] =
-        'No se pudieron cargar las mascotas.';
+        'No se pudieron cargar las mascotas. ' .
+        'Revisa la conexión y la clave de cifrado.';
 }
 
 try {
@@ -334,6 +397,17 @@ require_once __DIR__ . '/_styles.php';
                             }
 
                             $descripcion .= ')';
+
+                            $cedula = trim(
+                                (string) (
+                                    $mascota['cliente_cedula'] ?? ''
+                                )
+                            );
+
+                            if ($cedula !== '') {
+                                $descripcion .=
+                                    ' · Cédula: ' . $cedula;
+                            }
                             ?>
 
                             <option

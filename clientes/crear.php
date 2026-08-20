@@ -8,6 +8,16 @@ declare(strict_types=1);
 $raiz = dirname(__DIR__);
 
 /* =====================================================
+   CARGAR ARCHIVOS DEL SISTEMA
+===================================================== */
+
+require_once $raiz . '/config/app.php';
+require_once $raiz . '/includes/funciones.php';
+require_once $raiz . '/config/conexion.php';
+require_once $raiz . '/config/crypto.php';
+require_once $raiz . '/includes/auth.php';
+
+/* =====================================================
    INICIAR SESIÓN
 ===================================================== */
 
@@ -16,308 +26,172 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
 }
 
 /* =====================================================
-   CARGAR ARCHIVOS
+   PROTEGER LA PÁGINA
 ===================================================== */
 
-require_once $raiz . '/config/app.php';
-require_once $raiz . '/includes/funciones.php';
-require_once $raiz . '/config/conexion.php';
-require_once $raiz . '/includes/auth.php';
-
-/* =====================================================
-   VALIDAR USUARIO
-===================================================== */
-
-require_login();
-
-/* =====================================================
-   COMPROBAR CONEXIÓN
-===================================================== */
-
-if (!isset($pdo) || !($pdo instanceof PDO)) {
-    exit(
-        'No se encontró una conexión PDO válida.'
-    );
-}
-
-/* =====================================================
-   TOKEN DE SEGURIDAD
-===================================================== */
-
-if (empty($_SESSION['csrf_crear_cliente'])) {
-    $_SESSION['csrf_crear_cliente'] =
-        bin2hex(random_bytes(32));
-}
-
-/* =====================================================
-   DATOS DEL FORMULARIO
-===================================================== */
-
-$datos = [
-    'nombres' => '',
-    'apellidos' => '',
-    'cedula' => '',
-    'telefono' => '',
-    'email' => '',
-    'direccion' => ''
-];
-
-$mensajeError = '';
-
-/* =====================================================
-   REGISTRAR CLIENTE
-===================================================== */
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $datos = [
-        'nombres' => trim(
-            (string) ($_POST['nombres'] ?? '')
-        ),
-        'apellidos' => trim(
-            (string) ($_POST['apellidos'] ?? '')
-        ),
-        'cedula' => trim(
-            (string) ($_POST['cedula'] ?? '')
-        ),
-        'telefono' => trim(
-            (string) ($_POST['telefono'] ?? '')
-        ),
-        'email' => strtolower(
-            trim((string) ($_POST['email'] ?? ''))
-        ),
-        'direccion' => trim(
-            (string) ($_POST['direccion'] ?? '')
-        )
-    ];
-
-    $tokenFormulario = (string) (
-        $_POST['csrf_token'] ?? ''
-    );
-
-    $tokenSesion = (string) (
-        $_SESSION['csrf_crear_cliente'] ?? ''
-    );
-
-    /* =================================================
-       VALIDACIONES
-    ================================================= */
-
-    if (
-        $tokenSesion === '' ||
-        $tokenFormulario === '' ||
-        !hash_equals($tokenSesion, $tokenFormulario)
-    ) {
-        $mensajeError =
-            'La sesión del formulario expiró. Recarga la página.';
-    } elseif (
-        $datos['nombres'] === '' ||
-        $datos['apellidos'] === '' ||
-        $datos['cedula'] === '' ||
-        $datos['telefono'] === '' ||
-        $datos['email'] === '' ||
-        $datos['direccion'] === ''
-    ) {
-        $mensajeError = 'Todos los campos son obligatorios.';
-    } elseif (strlen($datos['nombres']) > 100) {
-        $mensajeError = 'Los nombres no pueden superar 100 caracteres.';
-    } elseif (strlen($datos['apellidos']) > 100) {
-        $mensajeError = 'Los apellidos no pueden superar 100 caracteres.';
-    } elseif (!preg_match('/^[0-9]{10}$/', $datos['cedula'])) {
-        $mensajeError =
-            'La cédula debe contener exactamente 10 números.';
-    } elseif (!preg_match('/^[0-9]{10}$/', $datos['telefono'])) {
-        $mensajeError =
-            'El teléfono debe contener exactamente 10 números.';
-    } elseif (!filter_var($datos['email'], FILTER_VALIDATE_EMAIL)) {
-        $mensajeError = 'El correo electrónico no es válido.';
-    } elseif (strlen($datos['email']) > 150) {
-        $mensajeError = 'El correo no puede superar 150 caracteres.';
-    } elseif (strlen($datos['direccion']) > 255) {
-        $mensajeError = 'La dirección no puede superar 255 caracteres.';
-    } else {
-        try {
-            /* =========================================
-               COMPROBAR DUPLICADOS
-            ========================================= */
-
-            $verificar = $pdo->prepare(
-                'SELECT id
-                 FROM clientes
-                 WHERE cedula = :cedula
-                    OR email = :email
-                 LIMIT 1'
-            );
-
-            $verificar->execute([
-                ':cedula' => $datos['cedula'],
-                ':email' => $datos['email']
-            ]);
-
-            if ($verificar->fetch(PDO::FETCH_ASSOC)) {
-                $mensajeError =
-                    'Ya existe un cliente con esa cédula o correo.';
-            } else {
-                /* =====================================
-                   INSERTAR CLIENTE
-                ===================================== */
-
-                $registrar = $pdo->prepare(
-                    'INSERT INTO clientes (
-                        nombres,
-                        apellidos,
-                        cedula,
-                        telefono,
-                        email,
-                        direccion
-                    ) VALUES (
-                        :nombres,
-                        :apellidos,
-                        :cedula,
-                        :telefono,
-                        :email,
-                        :direccion
-                    )'
-                );
-
-                $registrar->execute([
-                    ':nombres' => $datos['nombres'],
-                    ':apellidos' => $datos['apellidos'],
-                    ':cedula' => $datos['cedula'],
-                    ':telefono' => $datos['telefono'],
-                    ':email' => $datos['email'],
-                    ':direccion' => $datos['direccion']
-                ]);
-
-                $_SESSION['csrf_crear_cliente'] =
-                    bin2hex(random_bytes(32));
-
-                $_SESSION['flash'] = [
-                    'type' => 'success',
-                    'message' => 'Cliente registrado correctamente.'
-                ];
-
-                header(
-                    'Location: ' . url('clientes/index.php')
-                );
-                exit;
-            }
-        } catch (PDOException $error) {
-            error_log(
-                'Error PDO al registrar cliente: ' .
-                $error->getMessage()
-            );
-
-            if ($error->getCode() === '23000') {
-                $mensajeError =
-                    'La cédula o el correo ya están registrados.';
-            } else {
-                $mensajeError =
-                    'No se pudo registrar el cliente. Revisa la conexión y la tabla clientes.';
-            }
-        } catch (Throwable $error) {
-            error_log(
-                'Error inesperado al registrar cliente: ' .
-                $error->getMessage()
-            );
-
-            $mensajeError =
-                'Ocurrió un error inesperado al registrar el cliente.';
-        }
+if (function_exists('require_login')) {
+    require_login();
+} elseif (
+    empty($_SESSION['usuario_id']) &&
+    empty($_SESSION['id_usuario']) &&
+    empty($_SESSION['usuario'])
+) {
+    if (function_exists('redirect')) {
+        redirect('login.php');
     }
+
+    header('Location: ../login.php');
+    exit;
 }
+
+/* =====================================================
+   FUNCIONES AUXILIARES
+===================================================== */
+
+function textoSeguroClienteCrear(mixed $valor): string
+{
+    return htmlspecialchars(
+        (string) $valor,
+        ENT_QUOTES,
+        'UTF-8'
+    );
+}
+
+/* =====================================================
+   MENSAJE DE ERROR
+===================================================== */
+
+$error = trim((string) ($_GET['error'] ?? ''));
 
 /* =====================================================
    ENCABEZADO
 ===================================================== */
 
-$pageTitle = 'Registrar nuevo cliente';
+$pageTitle = 'Registrar cliente';
 $activePage = 'clientes';
 
 require_once $raiz . '/includes/header.php';
 ?>
 
 <style>
-    .registro-cliente-wrapper {
-        display: flex;
-        justify-content: center;
-        padding: 10px 0 40px;
+    .cliente-form-page {
+        width: min(980px, 100%);
+        margin: 0 auto;
+        padding-bottom: 42px;
     }
 
-    .registro-cliente-card {
-        width: min(850px, 100%);
+    .cliente-form-panel {
         overflow: hidden;
-        background: #ffffff;
-        border: 1px solid #dce5f0;
+        border: 1px solid #dbe5f0;
         border-radius: 18px;
-        box-shadow:
-            0 14px 35px
-            rgba(15, 35, 65, 0.09);
+        background: #ffffff;
+        box-shadow: 0 14px 38px rgba(15, 35, 65, 0.08);
     }
 
-    .registro-cliente-header {
+    .cliente-form-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
         padding: 24px 28px;
         border-bottom: 1px solid #e2e8f0;
-        background:
-            linear-gradient(
-                135deg,
-                #ffffff,
-                #f8fbff
-            );
+        background: linear-gradient(135deg, #ffffff, #f7fbff);
     }
 
-    .registro-cliente-header h2 {
+    .cliente-form-title {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+    }
+
+    .cliente-form-icon {
+        display: grid;
+        width: 48px;
+        height: 48px;
+        flex: 0 0 48px;
+        place-items: center;
+        border-radius: 14px;
+        background: #e0ecff;
+        font-size: 23px;
+    }
+
+    .cliente-form-header h1 {
         margin: 0 0 6px;
-        color: #06234a;
-        font-size: 22px;
+        color: #08264f;
+        font-size: 25px;
     }
 
-    .registro-cliente-header p {
+    .cliente-form-header p {
         margin: 0;
         color: #64748b;
         font-size: 14px;
     }
 
-    .registro-alerta {
-        margin: 22px 28px 0;
+    .cliente-form-back {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 40px;
+        padding: 9px 14px;
+        border-radius: 10px;
+        background: #eef2f7;
+        color: #334155;
+        font-size: 13px;
+        font-weight: 800;
+        text-decoration: none;
+        transition: .2s ease;
+    }
+
+    .cliente-form-back:hover {
+        background: #e2e8f0;
+    }
+
+    .cliente-form-body {
+        padding: 28px;
+    }
+
+    .cliente-form-alert {
+        margin-bottom: 22px;
         padding: 13px 16px;
         border: 1px solid #fecaca;
-        border-radius: 10px;
+        border-radius: 11px;
         background: #fff1f2;
         color: #b91c1c;
         font-size: 14px;
         font-weight: 700;
     }
 
-    .registro-cliente-form {
-        padding: 28px;
-    }
-
-    .registro-grid {
+    .cliente-form-grid {
         display: grid;
-        grid-template-columns:
-            repeat(2, minmax(0, 1fr));
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 20px;
     }
 
-    .registro-grupo {
+    .cliente-form-group {
         display: flex;
         flex-direction: column;
         gap: 8px;
     }
 
-    .registro-grupo-completo {
+    .cliente-form-group-full {
         grid-column: 1 / -1;
     }
 
-    .registro-grupo label {
-        color: #334155;
-        font-size: 14px;
-        font-weight: 700;
+    .cliente-form-group label {
+        color: #1e293b;
+        font-size: 13px;
+        font-weight: 800;
     }
 
-    .registro-grupo input {
+    .cliente-form-group label span {
+        color: #dc2626;
+    }
+
+    .cliente-form-control {
         width: 100%;
-        padding: 12px 14px;
+        box-sizing: border-box;
+        min-height: 44px;
+        padding: 11px 13px;
         border: 1px solid #cbd5e1;
         border-radius: 10px;
         background: #ffffff;
@@ -325,321 +199,291 @@ require_once $raiz . '/includes/header.php';
         font: inherit;
         font-size: 14px;
         outline: none;
-        transition:
-            border-color 0.15s ease,
-            box-shadow 0.15s ease;
+        transition: border-color .2s ease, box-shadow .2s ease;
     }
 
-    .registro-grupo input:focus {
+    .cliente-form-control:focus {
         border-color: #2563eb;
-        box-shadow:
-            0 0 0 3px
-            rgba(37, 99, 235, 0.13);
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
     }
 
-    .registro-ayuda {
-        color: #64748b;
+    textarea.cliente-form-control {
+        min-height: 105px;
+        resize: vertical;
+    }
+
+    .cliente-form-help {
+        color: #94a3b8;
         font-size: 12px;
+        line-height: 1.4;
     }
 
-    .registro-acciones {
+    .cliente-form-security {
         display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        margin-top: 24px;
+        padding: 14px 16px;
+        border: 1px solid #bfdbfe;
+        border-radius: 12px;
+        background: #eff6ff;
+        color: #1e40af;
+        font-size: 13px;
+        line-height: 1.5;
+    }
+
+    .cliente-form-security strong {
+        color: #1e3a8a;
+    }
+
+    .cliente-form-actions {
+        display: flex;
+        align-items: center;
         justify-content: flex-end;
-        gap: 12px;
+        gap: 10px;
         margin-top: 28px;
         padding-top: 22px;
-        border-top: 1px solid #e2e8f0;
+        border-top: 1px solid #e8eef5;
     }
 
-    .registro-btn {
+    .cliente-form-btn {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        min-height: 43px;
-        padding: 10px 18px;
+        min-height: 42px;
+        padding: 10px 17px;
         border: 0;
         border-radius: 10px;
         font: inherit;
         font-size: 14px;
-        font-weight: 700;
+        font-weight: 800;
         text-decoration: none;
         cursor: pointer;
+        transition: .2s ease;
     }
 
-    .registro-btn-cancelar {
-        background: #e9eef5;
+    .cliente-form-btn-cancel {
+        background: #eef2f7;
         color: #334155;
     }
 
-    .registro-btn-guardar {
+    .cliente-form-btn-cancel:hover {
+        background: #e2e8f0;
+    }
+
+    .cliente-form-btn-save {
         background: #2563eb;
         color: #ffffff;
-        box-shadow:
-            0 8px 18px
-            rgba(37, 99, 235, 0.22);
+        box-shadow: 0 8px 18px rgba(37, 99, 235, 0.22);
     }
 
-    .registro-btn-guardar:hover {
+    .cliente-form-btn-save:hover {
         background: #1d4ed8;
+        transform: translateY(-1px);
     }
 
-    @media (max-width: 700px) {
-        .registro-grid {
+    @media (max-width: 760px) {
+        .cliente-form-header {
+            align-items: stretch;
+            flex-direction: column;
+        }
+
+        .cliente-form-back {
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .cliente-form-grid {
             grid-template-columns: 1fr;
         }
 
-        .registro-grupo-completo {
+        .cliente-form-group-full {
             grid-column: auto;
         }
 
-        .registro-cliente-header,
-        .registro-cliente-form {
-            padding-left: 20px;
-            padding-right: 20px;
+        .cliente-form-body,
+        .cliente-form-header {
+            padding-left: 18px;
+            padding-right: 18px;
         }
 
-        .registro-acciones {
+        .cliente-form-actions {
+            align-items: stretch;
             flex-direction: column-reverse;
         }
 
-        .registro-btn {
+        .cliente-form-btn {
             width: 100%;
+            box-sizing: border-box;
         }
     }
 </style>
 
-<div class="registro-cliente-wrapper">
+<div class="cliente-form-page">
+    <section class="cliente-form-panel">
 
-    <div class="registro-cliente-card">
+        <header class="cliente-form-header">
+            <div class="cliente-form-title">
+                <div class="cliente-form-icon">👤</div>
 
-        <div class="registro-cliente-header">
+                <div>
+                    <h1>Registrar cliente</h1>
+                    <p>
+                        Ingresa la información personal y de contacto del cliente.
+                    </p>
+                </div>
+            </div>
 
-            <h2>
-                Datos del nuevo cliente
-            </h2>
+            <a
+                class="cliente-form-back"
+                href="<?= textoSeguroClienteCrear(url('clientes/index.php')) ?>"
+            >
+                ← Volver a clientes
+            </a>
+        </header>
 
-            <p>
-                Complete la información del propietario.
-            </p>
+        <div class="cliente-form-body">
+
+            <?php if ($error !== ''): ?>
+                <div
+                    class="cliente-form-alert"
+                    role="alert"
+                >
+                    ⚠️ <?= textoSeguroClienteCrear($error) ?>
+                </div>
+            <?php endif; ?>
+
+            <form
+                action="<?= textoSeguroClienteCrear(url('clientes/guardar.php')) ?>"
+                method="POST"
+                autocomplete="off"
+            >
+                <div class="cliente-form-grid">
+
+                    <div class="cliente-form-group">
+                        <label for="nombres">
+                            Nombres <span>*</span>
+                        </label>
+
+                        <input
+                            class="cliente-form-control"
+                            type="text"
+                            id="nombres"
+                            name="nombres"
+                            maxlength="100"
+                            placeholder="Ej. Juan Carlos"
+                            required
+                            autofocus
+                        >
+                    </div>
+
+                    <div class="cliente-form-group">
+                        <label for="apellidos">
+                            Apellidos <span>*</span>
+                        </label>
+
+                        <input
+                            class="cliente-form-control"
+                            type="text"
+                            id="apellidos"
+                            name="apellidos"
+                            maxlength="100"
+                            placeholder="Ej. Pérez Gómez"
+                            required
+                        >
+                    </div>
+
+                    <div class="cliente-form-group">
+                        <label for="cedula">Cédula</label>
+
+                        <input
+                            class="cliente-form-control"
+                            type="text"
+                            id="cedula"
+                            name="cedula"
+                            maxlength="13"
+                            inputmode="numeric"
+                            placeholder="Ej. 0951234567"
+                        >
+
+                        <small class="cliente-form-help">
+                            Ingresa únicamente números.
+                        </small>
+                    </div>
+
+                    <div class="cliente-form-group">
+                        <label for="telefono">
+                            Teléfono <span>*</span>
+                        </label>
+
+                        <input
+                            class="cliente-form-control"
+                            type="tel"
+                            id="telefono"
+                            name="telefono"
+                            maxlength="30"
+                            placeholder="Ej. 0991234567"
+                            required
+                        >
+                    </div>
+
+                    <div class="cliente-form-group cliente-form-group-full">
+                        <label for="email">Correo electrónico</label>
+
+                        <input
+                            class="cliente-form-control"
+                            type="email"
+                            id="email"
+                            name="email"
+                            maxlength="150"
+                            placeholder="Ej. cliente@email.com"
+                        >
+                    </div>
+
+                    <div class="cliente-form-group cliente-form-group-full">
+                        <label for="direccion">Dirección</label>
+
+                        <textarea
+                            class="cliente-form-control"
+                            id="direccion"
+                            name="direccion"
+                            maxlength="255"
+                            placeholder="Ej. Nobol, Guayas - Av. Principal..."
+                        ></textarea>
+                    </div>
+
+                </div>
+
+                <div class="cliente-form-security">
+                    <span>🔐</span>
+
+                    <div>
+                        <strong>Protección de datos personales.</strong><br>
+                        Los nombres, apellidos, cédula, teléfono, correo y dirección
+                        se cifran antes de almacenarse en la base de datos.
+                    </div>
+                </div>
+
+                <div class="cliente-form-actions">
+                    <a
+                        class="cliente-form-btn cliente-form-btn-cancel"
+                        href="<?= textoSeguroClienteCrear(url('clientes/index.php')) ?>"
+                    >
+                        Cancelar
+                    </a>
+
+                    <button
+                        class="cliente-form-btn cliente-form-btn-save"
+                        type="submit"
+                    >
+                        💾 Guardar cliente
+                    </button>
+                </div>
+            </form>
 
         </div>
-
-        <?php if ($mensajeError !== ''): ?>
-
-            <div
-                class="registro-alerta"
-                role="alert"
-            >
-                ⚠️ <?= e($mensajeError) ?>
-            </div>
-
-        <?php endif; ?>
-
-        <form
-            method="POST"
-            class="registro-cliente-form"
-            autocomplete="off"
-        >
-
-            <input
-                type="hidden"
-                name="csrf_token"
-                value="<?=
-                    e(
-                        $_SESSION[
-                            'csrf_crear_cliente'
-                        ]
-                    )
-                ?>"
-            >
-
-            <div class="registro-grid">
-
-                <div class="registro-grupo">
-
-                    <label for="nombres">
-                        Nombres
-                    </label>
-
-                    <input
-                        type="text"
-                        id="nombres"
-                        name="nombres"
-                        maxlength="100"
-                        placeholder="Ejemplo: Juan Carlos"
-                        value="<?= e($datos['nombres']) ?>"
-                        required
-                        autofocus
-                    >
-
-                </div>
-
-                <div class="registro-grupo">
-
-                    <label for="apellidos">
-                        Apellidos
-                    </label>
-
-                    <input
-                        type="text"
-                        id="apellidos"
-                        name="apellidos"
-                        maxlength="100"
-                        placeholder="Ejemplo: Pérez Gómez"
-                        value="<?= e($datos['apellidos']) ?>"
-                        required
-                    >
-
-                </div>
-
-                <div class="registro-grupo">
-
-                    <label for="cedula">
-                        Cédula
-                    </label>
-
-                    <input
-                        type="text"
-                        id="cedula"
-                        name="cedula"
-                        maxlength="10"
-                        inputmode="numeric"
-                        pattern="[0-9]{10}"
-                        placeholder="0912345678"
-                        value="<?= e($datos['cedula']) ?>"
-                        required
-                    >
-
-                    <span class="registro-ayuda">
-                        Debe contener 10 números.
-                    </span>
-
-                </div>
-
-                <div class="registro-grupo">
-
-                    <label for="telefono">
-                        Teléfono
-                    </label>
-
-                    <input
-                        type="text"
-                        id="telefono"
-                        name="telefono"
-                        maxlength="10"
-                        inputmode="numeric"
-                        pattern="[0-9]{10}"
-                        placeholder="0991234567"
-                        value="<?= e($datos['telefono']) ?>"
-                        required
-                    >
-
-                    <span class="registro-ayuda">
-                        Debe contener 10 números.
-                    </span>
-
-                </div>
-
-                <div
-                    class="
-                        registro-grupo
-                        registro-grupo-completo
-                    "
-                >
-
-                    <label for="email">
-                        Correo electrónico
-                    </label>
-
-                    <input
-                        type="email"
-                        id="email"
-                        name="email"
-                        maxlength="150"
-                        placeholder="cliente@correo.com"
-                        value="<?= e($datos['email']) ?>"
-                        required
-                    >
-
-                </div>
-
-                <div
-                    class="
-                        registro-grupo
-                        registro-grupo-completo
-                    "
-                >
-
-                    <label for="direccion">
-                        Dirección
-                    </label>
-
-                    <input
-                        type="text"
-                        id="direccion"
-                        name="direccion"
-                        maxlength="255"
-                        placeholder="Ejemplo: Av. Principal y calle 10"
-                        value="<?= e($datos['direccion']) ?>"
-                        required
-                    >
-
-                </div>
-
-            </div>
-
-            <div class="registro-acciones">
-
-                <a
-                    class="
-                        registro-btn
-                        registro-btn-cancelar
-                    "
-                    href="<?=
-                        e(
-                            url(
-                                'clientes/index.php'
-                            )
-                        )
-                    ?>"
-                >
-                    Cancelar
-                </a>
-
-                <button
-                    type="submit"
-                    class="
-                        registro-btn
-                        registro-btn-guardar
-                    "
-                >
-                    💾 Registrar cliente
-                </button>
-
-            </div>
-
-        </form>
-
-    </div>
-
+    </section>
 </div>
-
-<script>
-    document
-        .querySelectorAll(
-            '#cedula, #telefono'
-        )
-        .forEach((campo) => {
-            campo.addEventListener(
-                'input',
-                () => {
-                    campo.value = campo.value
-                        .replace(/\D/g, '')
-                        .slice(0, 10);
-                }
-            );
-        });
-</script>
 
 <?php
 require_once $raiz . '/includes/footer.php';

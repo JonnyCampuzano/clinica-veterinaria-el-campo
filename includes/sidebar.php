@@ -157,7 +157,7 @@ $claseActiva = static function (
                 <span>Usuarios</span>
             </a>
 
-            
+    
         <?php endif; ?>
 
     </nav>

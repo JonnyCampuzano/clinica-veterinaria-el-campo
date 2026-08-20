@@ -18,6 +18,7 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
 require_once $raiz . '/config/app.php';
 require_once $raiz . '/includes/funciones.php';
 require_once $raiz . '/config/conexion.php';
+require_once $raiz . '/config/crypto.php';
 require_once $raiz . '/includes/auth.php';
 
 /* =====================================================
@@ -125,6 +126,30 @@ try {
 
 if (!is_array($mascota)) {
     redirigirMascotas('error=no_encontrada');
+}
+
+/* =====================================================
+   DESCIFRAR DATOS DEL PROPIETARIO
+===================================================== */
+
+try {
+    $mascota['cliente_nombres'] = decrypt_personal(
+        $mascota['cliente_nombres'] ?? null
+    );
+
+    $mascota['cliente_apellidos'] = decrypt_personal(
+        $mascota['cliente_apellidos'] ?? null
+    );
+} catch (Throwable $errorDescifrado) {
+    error_log(
+        'Error al descifrar propietario al eliminar mascota ID ' .
+        $idMascota .
+        ': ' .
+        $errorDescifrado->getMessage()
+    );
+
+    $mascota['cliente_nombres'] = 'Dato protegido';
+    $mascota['cliente_apellidos'] = '';
 }
 
 /* =====================================================

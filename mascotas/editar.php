@@ -18,6 +18,7 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
 require_once $raiz . '/config/app.php';
 require_once $raiz . '/includes/funciones.php';
 require_once $raiz . '/config/conexion.php';
+require_once $raiz . '/config/crypto.php';
 require_once $raiz . '/includes/auth.php';
 
 /* =====================================================
@@ -99,11 +100,57 @@ try {
             apellidos,
             cedula
          FROM clientes
-         ORDER BY nombres ASC, apellidos ASC'
+         ORDER BY id ASC'
     );
 
-    $clientes = $consultaClientes->fetchAll(
+    $clientesCifrados = $consultaClientes->fetchAll(
         PDO::FETCH_ASSOC
+    );
+
+    $clientes = [];
+
+    foreach ($clientesCifrados as $cliente) {
+        try {
+            $cliente['nombres'] = decrypt_personal(
+                $cliente['nombres'] ?? null
+            );
+
+            $cliente['apellidos'] = decrypt_personal(
+                $cliente['apellidos'] ?? null
+            );
+
+            $cliente['cedula'] = decrypt_personal(
+                $cliente['cedula'] ?? null
+            );
+
+            $clientes[] = $cliente;
+        } catch (Throwable $errorDescifrado) {
+            error_log(
+                'Error al descifrar cliente ID ' .
+                (int) ($cliente['id'] ?? 0) .
+                ' en editar mascota: ' .
+                $errorDescifrado->getMessage()
+            );
+        }
+    }
+
+    usort(
+        $clientes,
+        static function (array $a, array $b): int {
+            $nombreA = trim(
+                (string) ($a['nombres'] ?? '') .
+                ' ' .
+                (string) ($a['apellidos'] ?? '')
+            );
+
+            $nombreB = trim(
+                (string) ($b['nombres'] ?? '') .
+                ' ' .
+                (string) ($b['apellidos'] ?? '')
+            );
+
+            return strcasecmp($nombreA, $nombreB);
+        }
     );
 } catch (Throwable $error) {
     error_log(

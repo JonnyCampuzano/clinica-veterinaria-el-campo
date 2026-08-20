@@ -14,6 +14,7 @@ $raiz = dirname(__DIR__);
 require_once $raiz . '/config/app.php';
 require_once $raiz . '/includes/funciones.php';
 require_once $raiz . '/config/conexion.php';
+require_once $raiz . '/config/crypto.php';
 require_once $raiz . '/includes/auth.php';
 
 /* =====================================================
@@ -85,6 +86,9 @@ $mascotas = [];
 
 /* =====================================================
    CONSULTAR MASCOTAS
+   Los datos personales del cliente están cifrados.
+   Se consultan primero, se descifran en PHP y luego
+   se aplica el filtro del buscador.
 ===================================================== */
 
 try {
@@ -109,41 +113,94 @@ try {
         FROM mascotas AS m
         INNER JOIN clientes AS c
             ON c.id = m.cliente_id
+        ORDER BY m.id DESC
     ';
 
-    $parametros = [];
-
-    if ($buscar !== '') {
-        $sql .= '
-            WHERE
-                m.nombre LIKE :buscar_nombre
-                OR m.especie LIKE :buscar_especie
-                OR COALESCE(m.raza, \'\') LIKE :buscar_raza
-                OR m.sexo LIKE :buscar_sexo
-                OR c.nombres LIKE :buscar_cliente_nombres
-                OR c.apellidos LIKE :buscar_cliente_apellidos
-                OR COALESCE(c.cedula, \'\') LIKE :buscar_cedula
-        ';
-
-        $termino = '%' . $buscar . '%';
-
-        $parametros = [
-            ':buscar_nombre' => $termino,
-            ':buscar_especie' => $termino,
-            ':buscar_raza' => $termino,
-            ':buscar_sexo' => $termino,
-            ':buscar_cliente_nombres' => $termino,
-            ':buscar_cliente_apellidos' => $termino,
-            ':buscar_cedula' => $termino,
-        ];
-    }
-
-    $sql .= ' ORDER BY m.id DESC';
-
     $consulta = $pdo->prepare($sql);
-    $consulta->execute($parametros);
+    $consulta->execute();
 
-    $mascotas = $consulta->fetchAll(PDO::FETCH_ASSOC);
+    $filas = $consulta->fetchAll(PDO::FETCH_ASSOC);
+    $mascotas = [];
+
+    foreach ($filas as $fila) {
+        try {
+            /*
+             * decrypt_personal() también permite temporalmente
+             * leer registros antiguos que aún estén en texto plano.
+             */
+            $fila['cliente_nombres'] = decrypt_personal(
+                $fila['cliente_nombres'] ?? null
+            );
+
+            $fila['cliente_apellidos'] = decrypt_personal(
+                $fila['cliente_apellidos'] ?? null
+            );
+
+            $fila['cliente_cedula'] = decrypt_personal(
+                $fila['cliente_cedula'] ?? null
+            );
+
+            $fila['cliente_telefono'] = decrypt_personal(
+                $fila['cliente_telefono'] ?? null
+            );
+        } catch (Throwable $errorDescifrado) {
+            error_log(
+                'Error al descifrar cliente de la mascota ID ' .
+                (int) ($fila['id'] ?? 0) .
+                ': ' .
+                $errorDescifrado->getMessage()
+            );
+
+            // No se expone el texto cifrado en la interfaz.
+            $fila['cliente_nombres'] = 'Dato protegido';
+            $fila['cliente_apellidos'] = '';
+            $fila['cliente_cedula'] = '';
+            $fila['cliente_telefono'] = '';
+        }
+
+        /*
+         * Como los nombres, apellidos y cédula están cifrados en MySQL,
+         * no se puede usar LIKE sobre esas columnas.
+         * El filtro se realiza después de descifrarlos en PHP.
+         */
+        if ($buscar !== '') {
+            $camposBusqueda = [
+                $fila['nombre'] ?? '',
+                $fila['especie'] ?? '',
+                $fila['raza'] ?? '',
+                $fila['sexo'] ?? '',
+                $fila['cliente_nombres'] ?? '',
+                $fila['cliente_apellidos'] ?? '',
+                trim(
+                    (string) ($fila['cliente_nombres'] ?? '') .
+                    ' ' .
+                    (string) ($fila['cliente_apellidos'] ?? '')
+                ),
+                $fila['cliente_cedula'] ?? '',
+            ];
+
+            $coincide = false;
+
+            foreach ($camposBusqueda as $campo) {
+                $campoTexto = (string) $campo;
+
+                if (
+                    function_exists('mb_stripos')
+                    ? mb_stripos($campoTexto, $buscar, 0, 'UTF-8') !== false
+                    : stripos($campoTexto, $buscar) !== false
+                ) {
+                    $coincide = true;
+                    break;
+                }
+            }
+
+            if (!$coincide) {
+                continue;
+            }
+        }
+
+        $mascotas[] = $fila;
+    }
 } catch (Throwable $error) {
     error_log(
         'Error al consultar mascotas: ' .
@@ -152,7 +209,7 @@ try {
 
     $mensajeError =
         'No se pudieron cargar las mascotas. ' .
-        'Revisa la tabla mascotas y la conexión a la base de datos.';
+        'Revisa la tabla mascotas, la clave de cifrado y la conexión a la base de datos.';
 }
 
 /* =====================================================
